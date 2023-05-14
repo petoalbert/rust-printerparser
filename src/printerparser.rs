@@ -3,10 +3,6 @@ use std::{collections::LinkedList, marker::PhantomData};
 /*
 Notes:
 
-The struct hierarchy currently owns all parsers. This gets complicated when a parser would be reused multiple
-times. What should we do? Implement clone and copy for everything? Or use borrowed values everywhere? Currently
-I just worked this around by using a function that creates a parser for separated_list
-
 Could add alternative as another essential combinator.
 
 Not having a flat_map has some limitations: it would be difficult to parse using some context, e.g.

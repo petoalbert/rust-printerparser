@@ -7,8 +7,6 @@ use crate::printerparser::PrinterParser;
 struct FunDef { name: String, args: Vec<String> }
 
 fn main() {
-    // This is a function because PrinterParser doesn't implement copy, and I needed to reuse this.
-    // Alternatively we could pass references to all combinator functions.
     let name = as_string(any_char.filter(|c| *c != '(' && *c != ',' && *c != ')').repeat());
     let args = surrounded_by(string("("), separated_list(name, string(",")), string(")"));
     let fun = preceded_by(string("fn "), name).zip_with(args).map(
