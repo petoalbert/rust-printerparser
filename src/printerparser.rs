@@ -65,14 +65,15 @@ pub fn separated_list<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     sep: PU,
 ) -> impl PrinterParser<LinkedList<A>> {
     let successors = preceded_by(sep, parser).repeat();
-    parser.zip_with(successors).map(
+    parser.zip_with(successors).map_result(
         |(v, mut vs)| {
             vs.push_front(v);
-            vs
+            Ok(vs)
         },
         |a| {
-            // TODO currently we require to have at least one element. Should fix it to allow 0
-            (a.front().unwrap().clone(), a.clone().split_off(1))
+            a.front().ok_or("At least one element required".to_owned()).map(|front| {
+                (front.clone(), a.clone().split_off(1))
+            })
         },
     )
 }
@@ -115,6 +116,22 @@ pub trait PrinterParser<A>: Copy {
         }
     }
 
+    fn map_result<B, F: Fn(A) -> Result<B, String>, G: Fn(B) -> Result<A, String>>(
+        self,
+        f: F,
+        g: G,
+    ) -> MapResult<A, B, F, G, Self>
+    where
+        Self: Sized,
+    {
+        MapResult {
+            parser: self,
+            f: f,
+            g: g,
+            phantom: PhantomData,
+        }
+    }
+
     fn zip_with<B, P: PrinterParser<B>>(self, other: P) -> ZipWith<A, B, Self, P>
     where
         Self: Sized,
@@ -145,9 +162,9 @@ pub struct Filter<A, F: Fn(&A) -> bool, P: PrinterParser<A>> {
     phantom: PhantomData<A>,
 }
 
-impl <A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Copy for Filter<A, F, P> { }
+impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Copy for Filter<A, F, P> {}
 
-impl <A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Clone for Filter<A, F, P> {
+impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Clone for Filter<A, F, P> {
     fn clone(&self) -> Self {
         Filter {
             parser: self.parser,
@@ -165,13 +182,56 @@ pub struct Map<A, B, F: Fn(A) -> B, G: Fn(B) -> A, P: PrinterParser<A> + Sized> 
 }
 
 impl<A, B, F: Fn(A) -> B + Copy, G: Fn(B) -> A + Copy, P: PrinterParser<A> + Sized> Copy
-  for Map<A, B, F, G, P> {}
+    for Map<A, B, F, G, P>
+{
+}
 
 impl<A, B, F: Fn(A) -> B + Copy, G: Fn(B) -> A + Copy, P: PrinterParser<A> + Sized> Clone
     for Map<A, B, F, G, P>
 {
     fn clone(&self) -> Self {
         Map {
+            parser: self.parser,
+            f: self.f,
+            g: self.g,
+            phantom: self.phantom,
+        }
+    }
+}
+
+pub struct MapResult<
+    A,
+    B,
+    F: Fn(A) -> Result<B, String>,
+    G: Fn(B) -> Result<A, String>,
+    P: PrinterParser<A> + Sized,
+> {
+    parser: P,
+    f: F,
+    g: G,
+    phantom: PhantomData<(A, B)>,
+}
+
+impl<
+        A,
+        B,
+        F: Fn(A) -> Result<B, String> + Copy,
+        G: Fn(B) -> Result<A, String> + Copy,
+        P: PrinterParser<A> + Sized,
+    > Copy for MapResult<A, B, F, G, P>
+{
+}
+
+impl<
+        A,
+        B,
+        F: Fn(A) -> Result<B, String> + Copy,
+        G: Fn(B) -> Result<A, String> + Copy,
+        P: PrinterParser<A> + Sized,
+    > Clone for MapResult<A, B, F, G, P>
+{
+    fn clone(&self) -> Self {
+        MapResult {
             parser: self.parser,
             f: self.f,
             g: self.g,
@@ -192,16 +252,20 @@ pub struct ZipWith<A, B, PA: PrinterParser<A>, PB: PrinterParser<B>> {
     phantom: PhantomData<(A, B)>,
 }
 
-impl <A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Copy for ZipWith<A,B,PA,PB> { }
+impl<A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Copy
+    for ZipWith<A, B, PA, PB>
+{
+}
 
-impl <A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Clone for ZipWith<A,B,PA,PB> {
+impl<A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Clone
+    for ZipWith<A, B, PA, PB>
+{
     fn clone(&self) -> Self {
         ZipWith {
             a: self.a,
             b: self.b,
-            phantom: self.phantom
+            phantom: self.phantom,
         }
-
     }
 }
 
@@ -210,13 +274,13 @@ pub struct Rep<A, P: PrinterParser<A>> {
     phantom: PhantomData<A>,
 }
 
-impl <A, P: PrinterParser<A> + Copy> Copy for Rep<A,P> { }
+impl<A, P: PrinterParser<A> + Copy> Copy for Rep<A, P> {}
 
-impl <A, P: PrinterParser<A> + Copy> Clone for Rep<A,P> {
+impl<A, P: PrinterParser<A> + Copy> Clone for Rep<A, P> {
     fn clone(&self) -> Self {
         Rep {
             parser: self.parser,
-            phantom: self.phantom
+            phantom: self.phantom,
         }
     }
 }
@@ -284,9 +348,22 @@ impl<A, B, F: Fn(A) -> B + Copy, G: Fn(B) -> A + Copy, P: PrinterParser<A>> Prin
     }
 }
 
-impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)>
-    for ZipWith<A, B, X, Y>
+impl<A, B, F: Fn(A) -> Result<B, String> + Copy, G: Fn(B) -> Result<A, String> + Copy, P: PrinterParser<A>> PrinterParser<B>
+    for MapResult<A, B, F, G, P>
 {
+    fn print(&self, i: B) -> Result<String, String> {
+        let o = (self.g)(i)?;
+        self.parser.print(o)
+    }
+
+    fn parse<'a>(&self, i: &'a str) -> Result<(&'a str, B), String> {
+        let (rem, a) = self.parser.parse(i)?;
+        let mapped = (self.f)(a)?;
+        Ok((rem, mapped))
+    }
+}
+
+impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)> for ZipWith<A, B, X, Y> {
     fn print(&self, i: (A, B)) -> Result<String, String> {
         let (a, b) = i;
         let x = (self.a).print(a)?;
