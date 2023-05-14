@@ -16,7 +16,7 @@ fn main() {
     
     let parsed = fun.parse("fn test(a,b,c)").unwrap().1;
     println!("Parsed: {:#?}", parsed);
-    let printed = fun.print(parsed);
+    let printed = fun.print(parsed).unwrap();
     println!("Printed: {}", printed);
 }
 
