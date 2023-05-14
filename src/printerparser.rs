@@ -59,7 +59,6 @@ pub fn surrounded_by<A, PA: PrinterParser<A>, PU1: PrinterParser<()>, PU2: Print
     followed_by(preceded_by(before, parser), after)
 }
 
-// TODO this has very bad performance and weird cloning of params, should fix this
 pub fn separated_list<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     parser: PA,
     sep: PU,
