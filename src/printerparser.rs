@@ -91,7 +91,7 @@ pub fn as_string(p: impl PrinterParser<LinkedList<char>>) -> impl PrinterParser<
 // PrinterParser trait
 
 pub trait PrinterParser<A>: Copy {
-    fn print(&self, i: &A) -> Result<String, String>;
+    fn print(&self, i: A) -> Result<String, String>;
 
     fn parse<'a>(&self, i: &'a str) -> Result<(&'a str, A), String>;
 
@@ -307,7 +307,7 @@ pub enum Either<A,B> {
 // Parser implementations
 
 impl<A : Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A,B>> for Alt<A, B, PA, PB> {
-    fn print(&self, i: &Either<A,B>) -> Result<String, String> {
+    fn print(&self, i: Either<A,B>) -> Result<String, String> {
        match i {
         Either::Left(a) => self.a.print(a),
         Either::Right(b) => self.b.print(b)
@@ -326,7 +326,7 @@ impl<A : Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParse
 }
 
 impl<'a> PrinterParser<()> for ExpectString<'a> {
-    fn print(&self, i: &()) -> Result<String, String> {
+    fn print(&self, i: ()) -> Result<String, String> {
         Ok(self.0.to_owned())
     }
 
@@ -346,7 +346,7 @@ impl<'a> PrinterParser<()> for ExpectString<'a> {
 }
 
 impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> PrinterParser<A> for Filter<A, F, P> {
-    fn print(&self, i: &A) -> Result<String, String> {
+    fn print(&self, i: A) -> Result<String, String> {
         self.parser.print(i) // TODO
     }
 
@@ -361,7 +361,7 @@ impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> PrinterParser<A> for Filt
 }
 
 impl PrinterParser<char> for ConsumeChar {
-    fn print(&self, i: &char) -> Result<String, String> {
+    fn print(&self, i: char) -> Result<String, String> {
         Ok(i.to_string())
     }
 
@@ -375,9 +375,9 @@ impl PrinterParser<char> for ConsumeChar {
 impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A>> PrinterParser<B>
     for Map<A, B, F, G, P>
 {
-    fn print(&self, i: &B) -> Result<String, String> {
-        let o = (self.g)(i);
-        self.parser.print(&o)
+    fn print(&self, i: B) -> Result<String, String> {
+        let o = (self.g)(&i);
+        self.parser.print(o)
     }
 
     fn parse<'a>(&self, i: &'a str) -> Result<(&'a str, B), String> {
@@ -389,9 +389,9 @@ impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A>> Pri
 impl<A, B, F: Fn(A) -> Result<B, String> + Copy, G: Fn(&B) -> Result<A, String> + Copy, P: PrinterParser<A>> PrinterParser<B>
     for MapResult<A, B, F, G, P>
 {
-    fn print(&self, i: &B) -> Result<String, String> {
-        let o = (self.g)(i)?;
-        self.parser.print(&o)
+    fn print(&self, i: B) -> Result<String, String> {
+        let o = (self.g)(&i)?;
+        self.parser.print(o)
     }
 
     fn parse<'a>(&self, i: &'a str) -> Result<(&'a str, B), String> {
@@ -402,7 +402,7 @@ impl<A, B, F: Fn(A) -> Result<B, String> + Copy, G: Fn(&B) -> Result<A, String> 
 }
 
 impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)> for ZipWith<A, B, X, Y> {
-    fn print(&self, i: &(A, B)) -> Result<String, String> {
+    fn print(&self, i: (A, B)) -> Result<String, String> {
         let (a, b) = i;
         let x = (self.a).print(a)?;
         let y = (self.b).print(b)?;
@@ -417,7 +417,7 @@ impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)> for Z
 }
 
 impl<A, P: PrinterParser<A>> PrinterParser<LinkedList<A>> for Rep<A, P> {
-    fn print(&self, x: &LinkedList<A>) -> Result<String, String> {
+    fn print(&self, x: LinkedList<A>) -> Result<String, String> {
         x.into_iter()
             .map(|item| (self.parser).print(item))
             .collect::<Result<Vec<String>, String>>()
