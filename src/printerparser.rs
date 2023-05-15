@@ -66,7 +66,7 @@ pub fn separated_list<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     parser: PA,
     sep: PU,
 ) -> impl PrinterParser<LinkedList<A>> {
-    let successors = preceded_by(sep, parser).repeat();
+    let successors = preceded_by(sep, parser.clone()).repeat();
     parser.zip_with(successors).map_result(
         |(v, mut vs)| {
             vs.push_front(v);
@@ -90,7 +90,7 @@ pub fn as_string(p: impl PrinterParser<LinkedList<char>>) -> impl PrinterParser<
 
 // PrinterParser trait
 
-pub trait PrinterParser<A>: Copy {
+pub trait PrinterParser<A: Clone>: Clone {
     fn print(&self, i: A) -> Result<String, String>;
 
     fn parse<'a>(&self, i: &'a str) -> Result<(&'a str, A), String>;
@@ -106,7 +106,7 @@ pub trait PrinterParser<A>: Copy {
         }
     }
 
-    fn map<B, F: Fn(A) -> B, G: Fn(&B) -> A>(self, f: F, g: G) -> Map<A, B, F, G, Self>
+    fn map<B: Clone, F: Fn(A) -> B, G: Fn(&B) -> A>(self, f: F, g: G) -> Map<A, B, F, G, Self>
     where
         Self: Sized,
     {
@@ -118,7 +118,7 @@ pub trait PrinterParser<A>: Copy {
         }
     }
 
-    fn map_result<B, F: Fn(A) -> Result<B, String>, G: Fn(&B) -> Result<A, String>>(
+    fn map_result<B: Clone, F: Fn(A) -> Result<B, String>, G: Fn(&B) -> Result<A, String>>(
         self,
         f: F,
         g: G,
@@ -134,7 +134,7 @@ pub trait PrinterParser<A>: Copy {
         }
     }
 
-    fn zip_with<B, P: PrinterParser<B>>(self, other: P) -> ZipWith<A, B, Self, P>
+    fn zip_with<B: Clone, P: PrinterParser<B>>(self, other: P) -> ZipWith<A, B, Self, P>
     where
         Self: Sized,
     {
@@ -155,66 +155,39 @@ pub trait PrinterParser<A>: Copy {
         }
     }
 
-    fn or<B: Copy, PB: PrinterParser<B>>(self, other: PB) -> Alt<A, B, Self, PB> where A: Copy {
+    fn or<B: Clone, PB: PrinterParser<B>>(self, other: PB) -> Alt<A, B, Self, PB> where A: Clone {
         Alt { a: self, b: other, phantom: PhantomData }
     } 
 }
 
 // Parser structs
 
-#[derive(Copy, Clone)]
-pub struct Alt<A: Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> {
+#[derive(Clone)]
+pub struct Alt<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> {
     a: PA,
     b: PB,
     phantom: PhantomData<(A,B)>
 }
 
-pub struct Filter<A, F: Fn(&A) -> bool, P: PrinterParser<A>> {
+#[derive(Clone)]
+pub struct Filter<A: Clone, F: Fn(&A) -> bool, P: PrinterParser<A>> {
     parser: P,
     predicate: F,
     phantom: PhantomData<A>,
 }
 
-impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Copy for Filter<A, F, P> {}
-
-impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> Clone for Filter<A, F, P> {
-    fn clone(&self) -> Self {
-        Filter {
-            parser: self.parser,
-            predicate: self.predicate,
-            phantom: self.phantom,
-        }
-    }
-}
-
-pub struct Map<A, B, F: Fn(A) -> B, G: Fn(&B) -> A, P: PrinterParser<A> + Sized> {
+#[derive(Clone)]
+pub struct Map<A: Clone, B: Clone, F: Fn(A) -> B, G: Fn(&B) -> A, P: PrinterParser<A> + Sized> {
     parser: P,
     f: F,
     g: G,
     phantom: PhantomData<(A, B)>,
 }
 
-impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A> + Sized> Copy
-    for Map<A, B, F, G, P>
-{
-}
-
-impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A> + Sized> Clone
-    for Map<A, B, F, G, P>
-{
-    fn clone(&self) -> Self {
-        Map {
-            parser: self.parser,
-            f: self.f,
-            g: self.g,
-            phantom: self.phantom,
-        }
-    }
-}
-
+#[derive(Clone)]
 pub struct MapResult<
-    A,
-    B,
+    A: Clone,
+    B: Clone,
     F: Fn(A) -> Result<B, String>,
     G: Fn(&B) -> Result<A, String>,
     P: PrinterParser<A> + Sized,
@@ -225,80 +198,26 @@ pub struct MapResult<
     phantom: PhantomData<(A, B)>,
 }
 
-impl<
-        A,
-        B,
-        F: Fn(A) -> Result<B, String> + Copy,
-        G: Fn(&B) -> Result<A, String> + Copy,
-        P: PrinterParser<A> + Sized,
-    > Copy for MapResult<A, B, F, G, P>
-{
-}
-
-impl<
-        A,
-        B,
-        F: Fn(A) -> Result<B, String> + Copy,
-        G: Fn(&B) -> Result<A, String> + Copy,
-        P: PrinterParser<A> + Sized,
-    > Clone for MapResult<A, B, F, G, P>
-{
-    fn clone(&self) -> Self {
-        MapResult {
-            parser: self.parser,
-            f: self.f,
-            g: self.g,
-            phantom: self.phantom,
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ConsumeChar;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ExpectString<'a>(&'a str);
 
-pub struct ZipWith<A, B, PA: PrinterParser<A>, PB: PrinterParser<B>> {
+#[derive(Clone)]
+pub struct ZipWith<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> {
     a: PA,
     b: PB,
     phantom: PhantomData<(A, B)>,
 }
 
-impl<A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Copy
-    for ZipWith<A, B, PA, PB>
-{
-}
-
-impl<A, B, PA: PrinterParser<A> + Copy, PB: PrinterParser<B> + Copy> Clone
-    for ZipWith<A, B, PA, PB>
-{
-    fn clone(&self) -> Self {
-        ZipWith {
-            a: self.a,
-            b: self.b,
-            phantom: self.phantom,
-        }
-    }
-}
-
-pub struct Rep<A, P: PrinterParser<A>> {
+#[derive(Clone)]
+pub struct Rep<A: Clone, P: PrinterParser<A>> {
     parser: P,
     phantom: PhantomData<A>,
 }
 
-impl<A, P: PrinterParser<A> + Copy> Copy for Rep<A, P> {}
-
-impl<A, P: PrinterParser<A> + Copy> Clone for Rep<A, P> {
-    fn clone(&self) -> Self {
-        Rep {
-            parser: self.parser,
-            phantom: self.phantom,
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Either<A,B> {
     Left(A),
     Right(B)
@@ -306,7 +225,7 @@ pub enum Either<A,B> {
 
 // Parser implementations
 
-impl<A : Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A,B>> for Alt<A, B, PA, PB> {
+impl<A : Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A,B>> for Alt<A, B, PA, PB> {
     fn print(&self, i: Either<A,B>) -> Result<String, String> {
        match i {
         Either::Left(a) => self.a.print(a),
@@ -345,7 +264,7 @@ impl<'a> PrinterParser<()> for ExpectString<'a> {
     }
 }
 
-impl<A, F: Fn(&A) -> bool + Copy, P: PrinterParser<A>> PrinterParser<A> for Filter<A, F, P> {
+impl<A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<A>> PrinterParser<A> for Filter<A, F, P> {
     fn print(&self, i: A) -> Result<String, String> {
         self.parser.print(i) // TODO
     }
@@ -372,7 +291,7 @@ impl PrinterParser<char> for ConsumeChar {
     }
 }
 
-impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A>> PrinterParser<B>
+impl<A: Clone, B: Clone, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<A>> PrinterParser<B>
     for Map<A, B, F, G, P>
 {
     fn print(&self, i: B) -> Result<String, String> {
@@ -386,7 +305,7 @@ impl<A, B, F: Fn(A) -> B + Copy, G: Fn(&B) -> A + Copy, P: PrinterParser<A>> Pri
     }
 }
 
-impl<A, B, F: Fn(A) -> Result<B, String> + Copy, G: Fn(&B) -> Result<A, String> + Copy, P: PrinterParser<A>> PrinterParser<B>
+impl<A: Clone, B: Clone, F: Fn(A) -> Result<B, String> + Clone, G: Fn(&B) -> Result<A, String> + Clone, P: PrinterParser<A>> PrinterParser<B>
     for MapResult<A, B, F, G, P>
 {
     fn print(&self, i: B) -> Result<String, String> {
@@ -401,7 +320,7 @@ impl<A, B, F: Fn(A) -> Result<B, String> + Copy, G: Fn(&B) -> Result<A, String> 
     }
 }
 
-impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)> for ZipWith<A, B, X, Y> {
+impl<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<(A, B)> for ZipWith<A, B, PA, PB> {
     fn print(&self, i: (A, B)) -> Result<String, String> {
         let (a, b) = i;
         let x = (self.a).print(a)?;
@@ -416,7 +335,7 @@ impl<A, B, X: PrinterParser<A>, Y: PrinterParser<B>> PrinterParser<(A, B)> for Z
     }
 }
 
-impl<A, P: PrinterParser<A>> PrinterParser<LinkedList<A>> for Rep<A, P> {
+impl<A: Clone, P: PrinterParser<A>> PrinterParser<LinkedList<A>> for Rep<A, P> {
     fn print(&self, x: LinkedList<A>) -> Result<String, String> {
         x.into_iter()
             .map(|item| (self.parser).print(item))

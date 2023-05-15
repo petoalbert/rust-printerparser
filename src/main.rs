@@ -3,12 +3,12 @@ mod printerparser;
 use printerparser::*;
 use crate::printerparser::PrinterParser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FunDef { name: String, args: Vec<String> }
 
 fn main() {
     let name = as_string(any_char.filter(|c| *c != '(' && *c != ',' && *c != ')').repeat());
-    let args = surrounded_by(string("("), separated_list(name, string(",")), string(")"));
+    let args = surrounded_by(string("("), separated_list(name.clone(), string(",")), string(")"));
     let fun = preceded_by(string("fn "), name).zip_with(args).map(
         |(name, args)| FunDef { name: name, args: args.into_iter().collect() },
         |f| (f.name.clone(), f.args.clone().into_iter().collect())
