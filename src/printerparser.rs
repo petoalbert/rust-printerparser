@@ -31,7 +31,10 @@ pub fn preceded_by<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     before: PU,
     parser: PA,
 ) -> impl PrinterParser<A> {
-    before.zip_with(parser).map(|(_, a)| a, |a| ((), (*a).clone()))
+    before.zip_with(parser).map(
+        |(_, a)| a,
+        |a| ((), (*a).clone())
+    )
 }
 
 pub fn followed_by<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
@@ -151,9 +154,20 @@ pub trait PrinterParser<A>: Copy {
             phantom: PhantomData,
         }
     }
+
+    fn or<B: Copy, PB: PrinterParser<B>>(self, other: PB) -> Alt<A, B, Self, PB> where A: Copy {
+        Alt { a: self, b: other, phantom: PhantomData }
+    } 
 }
 
 // Parser structs
+
+#[derive(Copy, Clone)]
+pub struct Alt<A: Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> {
+    a: PA,
+    b: PB,
+    phantom: PhantomData<(A,B)>
+}
 
 pub struct Filter<A, F: Fn(&A) -> bool, P: PrinterParser<A>> {
     parser: P,
@@ -284,7 +298,32 @@ impl<A, P: PrinterParser<A> + Copy> Clone for Rep<A, P> {
     }
 }
 
+#[derive(Debug)]
+pub enum Either<A,B> {
+    Left(A),
+    Right(B)
+}
+
 // Parser implementations
+
+impl<A : Copy, B: Copy, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A,B>> for Alt<A, B, PA, PB> {
+    fn print(&self, i: &Either<A,B>) -> Result<String, String> {
+       match i {
+        Either::Left(a) => self.a.print(a),
+        Either::Right(b) => self.b.print(b)
+       }
+    }
+
+    fn parse<'b>(&self, i: &'b str) -> Result<(&'b str, Either<A,B>), String> {
+        match self.a.parse(i) {
+            Ok((rem,a)) => Ok((rem,Either::Left(a))),
+            Err(_) => match self.b.parse(i) {
+                Ok((rem,b)) => Ok((rem,Either::Right(b))),
+                Err(e) => Err(e)
+            }
+        }
+    }
+}
 
 impl<'a> PrinterParser<()> for ExpectString<'a> {
     fn print(&self, i: &()) -> Result<String, String> {
