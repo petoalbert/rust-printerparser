@@ -7,7 +7,7 @@ use crate::printerparser::PrinterParser;
 struct FunDef { name: String, args: Vec<String> }
 
 fn main() {
-    let name = as_string(any_char.filter(|c| *c != '(' && *c != ',' && *c != ')').repeat());
+    let name = as_string(ANY_CHAR.filter(|c| *c != '(' && *c != ',' && *c != ')').repeat());
     let args = surrounded_by(string("("), separated_list(name.clone(), string(",")), string(")"));
     let fun = preceded_by(string("fn "), name).zip_with(args).map(
         |(name, args)| FunDef { name: name, args: args.into_iter().collect() },

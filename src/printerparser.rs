@@ -13,14 +13,31 @@ to print/parse to overcome that limitation, just like parserz does.
 
 // Helper functions
 
-pub const any_char: ConsumeChar = ConsumeChar;
+pub const ANY_CHAR: ConsumeChar = ConsumeChar;
 
+#[allow(dead_code)]
 pub fn digit() -> impl PrinterParser<char> {
-    any_char.filter(|c| c.is_digit(10))
+    ANY_CHAR.filter(|c| c.is_digit(10))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_digit_expected() {
+        assert!(matches!(digit().parse("2"), Ok(("", '2'))))
+    }
+
+    #[test]
+    fn test_digit_unexpected() {
+        assert!(matches!(digit().parse("a"), Err(_)))
+    }
+}
+
+#[allow(dead_code)]
 pub fn char(c: char) -> impl PrinterParser<()> {
-    any_char.filter(move |x| x == &c).map(|_| (), move |_| c)
+    ANY_CHAR.filter(move |x| x == &c).map(|_| (), move |_| c)
 }
 
 pub fn string<'a>(s: &'a str) -> impl PrinterParser<()> + 'a {
@@ -31,30 +48,44 @@ pub fn preceded_by<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     before: PU,
     parser: PA,
 ) -> impl PrinterParser<A> {
-    before.zip_with(parser).map(
-        |(_, a)| a,
-        |a| ((), (*a).clone())
-    )
+    before
+        .zip_with(parser)
+        .map(|(_, a)| a, |a| ((), (*a).clone()))
 }
 
 pub fn followed_by<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
     parser: PA,
     after: PU,
 ) -> impl PrinterParser<A> {
-    parser.zip_with(after).map(|(a, _)| a, |a| ((*a).clone(), ()))
+    parser
+        .zip_with(after)
+        .map(|(a, _)| a, |a| ((*a).clone(), ()))
 }
 
-pub fn separated_by<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>, PU: PrinterParser<()>>(
+#[allow(dead_code)]
+pub fn separated_by<
+    A: Clone,
+    B: Clone,
+    PA: PrinterParser<A>,
+    PB: PrinterParser<B>,
+    PU: PrinterParser<()>,
+>(
     a: PA,
     sep: PU,
     b: PB,
 ) -> impl PrinterParser<(A, B)> {
-    a.zip_with(sep)
-        .zip_with(b)
-        .map(|((a, _), b)| (a, b), |(a, b)| (((*a).clone(), ()), (*b).clone()))
+    a.zip_with(sep).zip_with(b).map(
+        |((a, _), b)| (a, b),
+        |(a, b)| (((*a).clone(), ()), (*b).clone()),
+    )
 }
 
-pub fn surrounded_by<A: Clone, PA: PrinterParser<A>, PU1: PrinterParser<()>, PU2: PrinterParser<()>>(
+pub fn surrounded_by<
+    A: Clone,
+    PA: PrinterParser<A>,
+    PU1: PrinterParser<()>,
+    PU2: PrinterParser<()>,
+>(
     before: PU1,
     parser: PA,
     after: PU2,
@@ -73,9 +104,9 @@ pub fn separated_list<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
             Ok(vs)
         },
         |a| {
-            a.front().ok_or("At least one element required".to_owned()).map(|front| {
-                (front.clone(), a.clone().split_off(1))
-            })
+            a.front()
+                .ok_or("At least one element required".to_owned())
+                .map(|front| (front.clone(), a.clone().split_off(1)))
         },
     )
 }
@@ -155,9 +186,16 @@ pub trait PrinterParser<A: Clone>: Clone {
         }
     }
 
-    fn or<B: Clone, PB: PrinterParser<B>>(self, other: PB) -> Alt<A, B, Self, PB> where A: Clone {
-        Alt { a: self, b: other, phantom: PhantomData }
-    } 
+    fn or<B: Clone, PB: PrinterParser<B>>(self, other: PB) -> Alt<A, B, Self, PB>
+    where
+        A: Clone,
+    {
+        Alt {
+            a: self,
+            b: other,
+            phantom: PhantomData,
+        }
+    }
 }
 
 // Parser structs
@@ -166,7 +204,7 @@ pub trait PrinterParser<A: Clone>: Clone {
 pub struct Alt<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> {
     a: PA,
     b: PB,
-    phantom: PhantomData<(A,B)>
+    phantom: PhantomData<(A, B)>,
 }
 
 #[derive(Clone)]
@@ -218,34 +256,36 @@ pub struct Rep<A: Clone, P: PrinterParser<A>> {
 }
 
 #[derive(Debug, Clone)]
-pub enum Either<A,B> {
+pub enum Either<A, B> {
     Left(A),
-    Right(B)
+    Right(B),
 }
 
 // Parser implementations
 
-impl<A : Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A,B>> for Alt<A, B, PA, PB> {
-    fn print(&self, i: Either<A,B>) -> Result<String, String> {
-       match i {
-        Either::Left(a) => self.a.print(a),
-        Either::Right(b) => self.b.print(b)
-       }
+impl<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<Either<A, B>>
+    for Alt<A, B, PA, PB>
+{
+    fn print(&self, i: Either<A, B>) -> Result<String, String> {
+        match i {
+            Either::Left(a) => self.a.print(a),
+            Either::Right(b) => self.b.print(b),
+        }
     }
 
-    fn parse<'b>(&self, i: &'b str) -> Result<(&'b str, Either<A,B>), String> {
+    fn parse<'b>(&self, i: &'b str) -> Result<(&'b str, Either<A, B>), String> {
         match self.a.parse(i) {
-            Ok((rem,a)) => Ok((rem,Either::Left(a))),
+            Ok((rem, a)) => Ok((rem, Either::Left(a))),
             Err(_) => match self.b.parse(i) {
-                Ok((rem,b)) => Ok((rem,Either::Right(b))),
-                Err(e) => Err(e)
-            }
+                Ok((rem, b)) => Ok((rem, Either::Right(b))),
+                Err(e) => Err(e),
+            },
         }
     }
 }
 
 impl<'a> PrinterParser<()> for ExpectString<'a> {
-    fn print(&self, i: ()) -> Result<String, String> {
+    fn print(&self, _: ()) -> Result<String, String> {
         Ok(self.0.to_owned())
     }
 
@@ -264,7 +304,9 @@ impl<'a> PrinterParser<()> for ExpectString<'a> {
     }
 }
 
-impl<A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<A>> PrinterParser<A> for Filter<A, F, P> {
+impl<A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<A>> PrinterParser<A>
+    for Filter<A, F, P>
+{
     fn print(&self, i: A) -> Result<String, String> {
         self.parser.print(i) // TODO
     }
@@ -291,8 +333,8 @@ impl PrinterParser<char> for ConsumeChar {
     }
 }
 
-impl<A: Clone, B: Clone, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<A>> PrinterParser<B>
-    for Map<A, B, F, G, P>
+impl<A: Clone, B: Clone, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<A>>
+    PrinterParser<B> for Map<A, B, F, G, P>
 {
     fn print(&self, i: B) -> Result<String, String> {
         let o = (self.g)(&i);
@@ -305,8 +347,13 @@ impl<A: Clone, B: Clone, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: Print
     }
 }
 
-impl<A: Clone, B: Clone, F: Fn(A) -> Result<B, String> + Clone, G: Fn(&B) -> Result<A, String> + Clone, P: PrinterParser<A>> PrinterParser<B>
-    for MapResult<A, B, F, G, P>
+impl<
+        A: Clone,
+        B: Clone,
+        F: Fn(A) -> Result<B, String> + Clone,
+        G: Fn(&B) -> Result<A, String> + Clone,
+        P: PrinterParser<A>,
+    > PrinterParser<B> for MapResult<A, B, F, G, P>
 {
     fn print(&self, i: B) -> Result<String, String> {
         let o = (self.g)(&i)?;
@@ -320,7 +367,9 @@ impl<A: Clone, B: Clone, F: Fn(A) -> Result<B, String> + Clone, G: Fn(&B) -> Res
     }
 }
 
-impl<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<(A, B)> for ZipWith<A, B, PA, PB> {
+impl<A: Clone, B: Clone, PA: PrinterParser<A>, PB: PrinterParser<B>> PrinterParser<(A, B)>
+    for ZipWith<A, B, PA, PB>
+{
     fn print(&self, i: (A, B)) -> Result<String, String> {
         let (a, b) = i;
         let x = (self.a).print(a)?;
