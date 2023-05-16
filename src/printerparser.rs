@@ -48,6 +48,23 @@ pub fn followed_by<A: Clone, PA: PrinterParser<A>, PU: PrinterParser<()>>(
 }
 
 #[allow(dead_code)]
+pub fn many1<A: Clone, PA: PrinterParser<A>>(combinator: PA) -> impl PrinterParser<LinkedList<A>> {
+    let c2 = combinator.clone();
+
+    combinator.zip_with(c2.repeat().clone()).map_result(
+        |(a, mut aa)| {
+            aa.push_front(a);
+            return Ok(aa);
+        },
+        |a| {
+            a.front()
+                .ok_or("At least one element required".to_owned())
+                .map(|front| (front.clone(), a.clone().split_off(1)))
+        },
+    )
+}
+
+#[allow(dead_code)]
 pub fn separated_by<
     A: Clone,
     B: Clone,
@@ -427,21 +444,41 @@ mod tests {
         let grammar = string("rust").repeat();
 
         let values = vec![(), (), ()];
-        let mut listForParse = LinkedList::new();
+        let mut list_for_parse = LinkedList::new();
 
-        listForParse.extend(values);
+        list_for_parse.extend(values);
 
         match grammar.parse("rustrustrust") {
-            Ok(("", result)) => assert_eq!(result, listForParse),
+            Ok(("", result)) => assert_eq!(result, list_for_parse),
             _ => panic!("Unexpected value"),
         }
 
         let values = vec![(), ()];
-        let mut listForPrint = LinkedList::new();
+        let mut list_for_print = LinkedList::new();
 
-        listForPrint.extend(values);
+        list_for_print.extend(values);
 
-        assert_eq!(grammar.print(listForPrint).unwrap(), "rustrust")
+        assert_eq!(grammar.print(list_for_print).unwrap(), "rustrust")
+    }
+
+    #[test]
+    fn test_many1() {
+        let grammar = many1(string("rust"));
+        let values = vec![(), ()];
+        let mut list_for_parse = LinkedList::new();
+
+        list_for_parse.extend(values);
+
+        match grammar.parse("rustrust") {
+            Ok(("", result)) => assert_eq!(result, list_for_parse),
+            _ => panic!("Unexpected value"),
+        }
+
+        let values = vec![()];
+        let mut list_for_parse2 = LinkedList::new();
+        list_for_parse2.extend(values);
+
+        assert!(matches!(grammar.parse(""), Err(_)))
     }
 
     #[test]
