@@ -20,21 +20,6 @@ pub fn digit() -> impl PrinterParser<char> {
     ANY_CHAR.filter(|c| c.is_digit(10))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_digit_expected() {
-        assert!(matches!(digit().parse("2"), Ok(("", '2'))))
-    }
-
-    #[test]
-    fn test_digit_unexpected() {
-        assert!(matches!(digit().parse("a"), Err(_)))
-    }
-}
-
 #[allow(dead_code)]
 pub fn char(c: char) -> impl PrinterParser<()> {
     ANY_CHAR.filter(move |x| x == &c).map(|_| (), move |_| c)
@@ -406,5 +391,70 @@ impl<A: Clone, P: PrinterParser<A>> PrinterParser<LinkedList<A>> for Rep<A, P> {
             }
         }
         Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_digit_expected() {
+        assert!(matches!(digit().parse("2"), Ok(("", '2'))));
+        assert!(matches!(digit().parse("a"), Err(_)));
+        assert_eq!(digit().print('2').unwrap(), "2")
+    }
+
+    #[test]
+    fn test_string() {
+        assert!(matches!(
+            string("hello").parse("hello there"),
+            Ok((" there", ()))
+        ));
+
+        assert_eq!(string("hello").print(()).unwrap(), "hello")
+    }
+
+    #[test]
+    fn test_preceded_by() {
+        let grammar = preceded_by(char('*'), string("hello"));
+        assert!(matches!(grammar.parse("*hello"), Ok(("", ()))));
+        assert_eq!(string("*hello").print(()).unwrap(), "*hello")
+    }
+
+    #[test]
+    fn test_repeat() {
+        let grammar = string("rust").repeat();
+
+        let values = vec![(), (), ()];
+        let mut listForParse = LinkedList::new();
+
+        listForParse.extend(values);
+
+        match grammar.parse("rustrustrust") {
+            Ok(("", result)) => assert_eq!(result, listForParse),
+            _ => panic!("Unexpected value"),
+        }
+
+        let values = vec![(), ()];
+        let mut listForPrint = LinkedList::new();
+
+        listForPrint.extend(values);
+
+        assert_eq!(grammar.print(listForPrint).unwrap(), "rustrust")
+    }
+
+    #[test]
+    fn test_or() {
+        let grammar = string("rust").or(string("haskell"));
+
+        assert!(matches!(grammar.parse("rust"), Ok(("", Either::Left(())))));
+        assert!(matches!(
+            grammar.parse("haskell"),
+            Ok(("", Either::Right(())))
+        ));
+        assert!(matches!(grammar.parse("javascript"), Err(_)));
+        assert_eq!(grammar.print(Either::Left(())).unwrap(), "rust");
+        assert_eq!(grammar.print(Either::Right(())).unwrap(), "haskell");
     }
 }
