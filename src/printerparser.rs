@@ -3,8 +3,6 @@ use std::{collections::LinkedList, marker::PhantomData};
 /*
 Notes:
 
-Could add alternative as another essential combinator.
-
 Not having a flat_map has some limitations: it would be difficult to parse using some context, e.g.
 something like python/yaml where the indentation is increased at every level. We could add a state parameter
 to print/parse to overcome that limitation, just like parserz does.
@@ -62,6 +60,14 @@ pub fn many1<A: Clone, PA: PrinterParser<A>>(combinator: PA) -> impl PrinterPars
                 .map(|front| (front.clone(), a.clone().split_off(1)))
         },
     )
+}
+
+#[allow(dead_code)]
+pub fn take_while<A: Clone, PA: PrinterParser<A>, F: Fn(&A) -> bool + Clone>(
+    parser: PA,
+    predicate: F,
+) -> impl PrinterParser<LinkedList<A>> {
+    parser.filter(predicate).repeat()
 }
 
 #[allow(dead_code)]
@@ -514,5 +520,24 @@ mod tests {
         assert!(matches!(grammar.parse("javascript"), Err(_)));
         assert_eq!(grammar.print(Either::Left(())).unwrap(), "rust");
         assert_eq!(grammar.print(Either::Right(())).unwrap(), "haskell");
+    }
+
+    #[test]
+    fn test_take_while() {
+        let grammar = take_while(ANY_CHAR, |a| a.is_digit(10));
+        let values = vec!['1', '2', '3'];
+        let mut list_for_parse = LinkedList::new();
+
+        list_for_parse.extend(values);
+
+        match grammar.parse("123aaaa") {
+            Ok(("aaaa", result)) => assert_eq!(result, list_for_parse),
+            v => panic!("Unexpected value {:?}", v),
+        }
+
+        match grammar.parse("aaaa") {
+            Ok(("aaaa", result)) => assert_eq!(result, LinkedList::new()),
+            v => panic!("Unexpected value {:?}", v),
+        }
     }
 }
