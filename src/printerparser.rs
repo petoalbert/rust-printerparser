@@ -23,6 +23,10 @@ pub fn char<S>(c: char) -> impl PrinterParser<S, ()> {
     ANY_CHAR.filter(move |x| x == &c).map(|_| (), move |_| c)
 }
 
+pub fn bytes<S>(count: usize) -> impl PrinterParser<S, Vec<u8>> {
+    ConsumeBytes(count)
+}
+
 pub fn string<'a, S>(s: &'a str) -> impl PrinterParser<S, ()> + 'a {
     ExpectString(s.as_bytes())
 }
@@ -326,6 +330,9 @@ impl<
 pub struct ConsumeChar;
 
 #[derive(Clone)]
+pub struct ConsumeBytes(usize);
+
+#[derive(Clone)]
 pub struct ExpectString<'a>(&'a [u8]);
 
 pub struct ZipWith<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
@@ -423,6 +430,20 @@ impl<S, A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterPars
             Ok((rem, a))
         } else {
             Err("Filter predicate didn't match".to_owned())
+        }
+    }
+}
+
+impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
+    fn write(&self, i: Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+        Ok(i)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
+        if (i.len() < self.0.into()) {
+            Err("input has not enough elements left".to_owned())
+        } else {
+            Ok((&i[(self.0)..], i[0..(self.0)].to_owned().into_iter().collect()))
         }
     }
 }
