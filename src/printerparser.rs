@@ -134,20 +134,20 @@ pub fn as_string<S>(p: impl PrinterParser<S, LinkedList<char>>) -> impl PrinterP
 // PrinterParser trait
 
 pub trait PrinterParser<S, A: Clone>: Clone {
-    fn write(&self, i: A) -> Result<Vec<u8>, String>;
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String>;
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], A), String>;
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String>;
 
-    fn print(&self, i: A, s: S) -> Result<String, String> {
-        self.write(i).and_then(|bytes| {
+    fn print(&self, i: A, s: &mut S) -> Result<String, String> {
+        self.write(i, s).and_then(|bytes| {
             std::str::from_utf8(&bytes)
                 .map(|s| s.to_owned())
                 .map_err(|e| format!("{}", e))
         })
     }
 
-    fn parse<'a>(&self, i: &'a str, s: S) -> Result<(&'a str, A), String> {
-        self.read(i.as_bytes()).and_then(|(rem, a)| {
+    fn parse<'a>(&self, i: &'a str, s: &mut S) -> Result<(&'a str, A), String> {
+        self.read(i.as_bytes(), s).and_then(|(rem, a)| {
             std::str::from_utf8(rem)
                 .map_err(|e| format!("{}", e))
                 .map(|s| (s, a))
@@ -234,12 +234,14 @@ pub struct Alt<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl <S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> Clone for Alt<S, A, B, PA, PB> {
+impl<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> Clone
+    for Alt<S, A, B, PA, PB>
+{
     fn clone(&self) -> Self {
         Alt {
             a: self.a.clone(),
             b: self.b.clone(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -250,12 +252,12 @@ pub struct Filter<S, A: Clone, F: Fn(&A) -> bool, P: PrinterParser<S, A>> {
     phantom: PhantomData<(A, S)>,
 }
 
-impl <S, A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> Clone for Filter<S, A, F, P> {
+impl<S, A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> Clone for Filter<S, A, F, P> {
     fn clone(&self) -> Self {
         Filter {
             parser: self.parser.clone(),
             predicate: self.predicate.clone(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -268,13 +270,21 @@ pub struct Map<S, A: Clone, B: Clone, F: Fn(A) -> B, G: Fn(&B) -> A, P: PrinterP
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl <S, A: Clone, B: Clone, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A> + Sized> Clone for Map<S, A, B, F, G, P> {
+impl<
+        S,
+        A: Clone,
+        B: Clone,
+        F: Fn(A) -> B + Clone,
+        G: Fn(&B) -> A + Clone,
+        P: PrinterParser<S, A> + Sized,
+    > Clone for Map<S, A, B, F, G, P>
+{
     fn clone(&self) -> Self {
         Map {
             parser: self.parser.clone(),
             f: self.f.clone(),
             g: self.g.clone(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -341,11 +351,11 @@ pub struct Rep<S, A: Clone, P: PrinterParser<S, A>> {
     phantom: PhantomData<(A, S)>,
 }
 
-impl <S, A: Clone, P: PrinterParser<S, A>> Clone for Rep<S, A, P> {
+impl<S, A: Clone, P: PrinterParser<S, A>> Clone for Rep<S, A, P> {
     fn clone(&self) -> Self {
         Rep {
             parser: self.parser.clone(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -361,17 +371,17 @@ pub enum Either<A, B> {
 impl<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>>
     PrinterParser<S, Either<A, B>> for Alt<S, A, B, PA, PB>
 {
-    fn write(&self, i: Either<A, B>) -> Result<Vec<u8>, String> {
+    fn write(&self, i: Either<A, B>, s: &mut S) -> Result<Vec<u8>, String> {
         match i {
-            Either::Left(a) => self.a.write(a),
-            Either::Right(b) => self.b.write(b),
+            Either::Left(a) => self.a.write(a, s),
+            Either::Right(b) => self.b.write(b, s),
         }
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], Either<A, B>), String> {
-        match self.a.read(i) {
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Either<A, B>), String> {
+        match self.a.read(i, s) {
             Ok((rem, a)) => Ok((rem, Either::Left(a))),
-            Err(_) => match self.b.read(i) {
+            Err(_) => match self.b.read(i, s) {
                 Ok((rem, b)) => Ok((rem, Either::Right(b))),
                 Err(e) => Err(e),
             },
@@ -380,11 +390,11 @@ impl<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>>
 }
 
 impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
-    fn write(&self, _: ()) -> Result<Vec<u8>, String> {
+    fn write(&self, _: (), s: &mut S) -> Result<Vec<u8>, String> {
         Ok(self.0.to_vec())
     }
 
-    fn read<'b>(&self, i: &'b [u8]) -> Result<(&'b [u8], ()), String> {
+    fn read<'b>(&self, i: &'b [u8], s: &mut S) -> Result<(&'b [u8], ()), String> {
         if i.len() < self.0.len() {
             Err(format!("Cannot match {}, not enough input", "FIXME"))
         } else {
@@ -403,12 +413,12 @@ impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
 impl<S, A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParser<S, A>
     for Filter<S, A, F, P>
 {
-    fn write(&self, i: A) -> Result<Vec<u8>, String> {
-        self.parser.write(i) // TODO
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+        self.parser.write(i, s) // TODO
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], A), String> {
-        let (rem, a) = self.parser.read(i)?;
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
+        let (rem, a) = self.parser.read(i, s)?;
         if (self.predicate)(&a) {
             Ok((rem, a))
         } else {
@@ -418,11 +428,11 @@ impl<S, A: Clone, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterPars
 }
 
 impl<S> PrinterParser<S, char> for ConsumeChar {
-    fn write(&self, i: char) -> Result<Vec<u8>, String> {
+    fn write(&self, i: char, s: &mut S) -> Result<Vec<u8>, String> {
         Ok(i.to_string().bytes().collect())
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], char), String> {
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], char), String> {
         std::str::from_utf8(&i[..1])
             .or_else(|_| std::str::from_utf8(&i[..2]))
             .or_else(|_| std::str::from_utf8(&i[..3]))
@@ -441,13 +451,13 @@ impl<
         P: PrinterParser<S, A>,
     > PrinterParser<S, B> for Map<S, A, B, F, G, P>
 {
-    fn write(&self, i: B) -> Result<Vec<u8>, String> {
+    fn write(&self, i: B, s: &mut S) -> Result<Vec<u8>, String> {
         let o = (self.g)(&i);
-        self.parser.write(o)
+        self.parser.write(o, s)
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], B), String> {
-        let (rem, a) = self.parser.read(i)?;
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], B), String> {
+        let (rem, a) = self.parser.read(i, s)?;
         Ok((rem, (self.f)(a)))
     }
 }
@@ -461,13 +471,13 @@ impl<
         P: PrinterParser<S, A>,
     > PrinterParser<S, B> for MapResult<S, A, B, F, G, P>
 {
-    fn write(&self, i: B) -> Result<Vec<u8>, String> {
+    fn write(&self, i: B, s: &mut S) -> Result<Vec<u8>, String> {
         let o = (self.g)(&i)?;
-        self.parser.write(o)
+        self.parser.write(o, s)
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], B), String> {
-        let (rem, a) = self.parser.read(i)?;
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], B), String> {
+        let (rem, a) = self.parser.read(i, s)?;
         let mapped = (self.f)(a)?;
         Ok((rem, mapped))
     }
@@ -476,34 +486,34 @@ impl<
 impl<S, A: Clone, B: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>>
     PrinterParser<S, (A, B)> for ZipWith<S, A, B, PA, PB>
 {
-    fn write(&self, i: (A, B)) -> Result<Vec<u8>, String> {
+    fn write(&self, i: (A, B), s: &mut S) -> Result<Vec<u8>, String> {
         let (a, b) = i;
-        let mut x = (self.a).write(a)?;
-        let mut y = (self.b).write(b)?;
+        let mut x = (self.a).write(a, s)?;
+        let mut y = (self.b).write(b, s)?;
         x.append(&mut y); // TODO Vec is not good for performance here
         Ok(x)
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], (A, B)), String> {
-        let (rem1, a) = self.a.read(i)?;
-        let (rem2, b) = self.b.read(rem1)?;
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], (A, B)), String> {
+        let (rem1, a) = self.a.read(i, s)?;
+        let (rem2, b) = self.b.read(rem1, s)?;
         Ok((rem2, (a, b)))
     }
 }
 
 impl<S, A: Clone, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rep<S, A, P> {
-    fn write(&self, x: LinkedList<A>) -> Result<Vec<u8>, String> {
+    fn write(&self, x: LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
         x.into_iter()
-            .map(|item| (self.parser).write(item))
+            .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat()) // TODO bad performance
     }
 
-    fn read<'a>(&self, i: &'a [u8]) -> Result<(&'a [u8], LinkedList<A>), String> {
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], LinkedList<A>), String> {
         let mut elements = LinkedList::new();
         let mut rem = i;
         loop {
-            let res = self.parser.read(rem);
+            let res = self.parser.read(rem, s);
             match res {
                 Err(_) => break,
                 Ok((rem1, a)) => {
@@ -522,26 +532,26 @@ mod tests {
 
     #[test]
     fn test_digit_expected() {
-        assert!(matches!(digit().parse("2", ()), Ok(("", '2'))));
-        assert!(matches!(digit().parse("a", ()), Err(_)));
-        assert_eq!(digit().print('2', ()).unwrap(), "2")
+        assert!(matches!(digit().parse("2", &mut ()), Ok(("", '2'))));
+        assert!(matches!(digit().parse("a", &mut ()), Err(_)));
+        assert_eq!(digit().print('2', &mut ()).unwrap(), "2")
     }
 
     #[test]
     fn test_string() {
         assert!(matches!(
-            string("hello").parse("hello there", ()),
+            string("hello").parse("hello there", &mut ()),
             Ok((" there", ()))
         ));
 
-        assert_eq!(string("hello").print((), ()).unwrap(), "hello")
+        assert_eq!(string("hello").print((), &mut ()).unwrap(), "hello")
     }
 
     #[test]
     fn test_preceded_by() {
         let grammar = preceded_by(char('*'), string("hello"));
-        assert!(matches!(grammar.parse("*hello", ()), Ok(("", ()))));
-        assert_eq!(string("*hello").print((), ()).unwrap(), "*hello")
+        assert!(matches!(grammar.parse("*hello", &mut ()), Ok(("", ()))));
+        assert_eq!(string("*hello").print((), &mut ()).unwrap(), "*hello")
     }
 
     #[test]
@@ -553,7 +563,7 @@ mod tests {
 
         list_for_parse.extend(values);
 
-        match grammar.parse("rustrustrust", ()) {
+        match grammar.parse("rustrustrust", &mut ()) {
             Ok(("", result)) => assert_eq!(result, list_for_parse),
             _ => panic!("Unexpected value"),
         }
@@ -563,7 +573,7 @@ mod tests {
 
         list_for_print.extend(values);
 
-        assert_eq!(grammar.print(list_for_print, ()).unwrap(), "rustrust")
+        assert_eq!(grammar.print(list_for_print, &mut ()).unwrap(), "rustrust")
     }
 
     #[test]
@@ -574,7 +584,7 @@ mod tests {
 
         list_for_parse.extend(values);
 
-        match grammar.parse("rustrust", ()) {
+        match grammar.parse("rustrust", &mut ()) {
             Ok(("", result)) => assert_eq!(result, list_for_parse),
             _ => panic!("Unexpected value"),
         }
@@ -583,21 +593,27 @@ mod tests {
         let mut list_for_parse2 = LinkedList::new();
         list_for_parse2.extend(values);
 
-        assert!(matches!(grammar.parse("", ()), Err(_)))
+        assert!(matches!(grammar.parse("", &mut ()), Err(_)))
     }
 
     #[test]
     fn test_or() {
         let grammar = string("rust").or(string("haskell"));
 
-        assert!(matches!(grammar.parse("rust", ()), Ok(("", Either::Left(())))));
         assert!(matches!(
-            grammar.parse("haskell", ()),
+            grammar.parse("rust", &mut ()),
+            Ok(("", Either::Left(())))
+        ));
+        assert!(matches!(
+            grammar.parse("haskell", &mut ()),
             Ok(("", Either::Right(())))
         ));
-        assert!(matches!(grammar.parse("javascript", ()), Err(_)));
-        assert_eq!(grammar.print(Either::Left(()), ()).unwrap(), "rust");
-        assert_eq!(grammar.print(Either::Right(()), ()).unwrap(), "haskell");
+        assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
+        assert_eq!(grammar.print(Either::Left(()), &mut ()).unwrap(), "rust");
+        assert_eq!(
+            grammar.print(Either::Right(()), &mut ()).unwrap(),
+            "haskell"
+        );
     }
 
     #[test]
@@ -608,12 +624,12 @@ mod tests {
 
         list_for_parse.extend(values);
 
-        match grammar.parse("123aaaa", ()) {
+        match grammar.parse("123aaaa", &mut ()) {
             Ok(("aaaa", result)) => assert_eq!(result, list_for_parse),
             v => panic!("Unexpected value {:?}", v),
         }
 
-        match grammar.parse("aaaa", ()) {
+        match grammar.parse("aaaa", &mut ()) {
             Ok(("aaaa", result)) => assert_eq!(result, LinkedList::new()),
             v => panic!("Unexpected value {:?}", v),
         }

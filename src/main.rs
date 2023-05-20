@@ -14,9 +14,9 @@ fn main() {
         |f| (f.name.clone(), f.args.clone().into_iter().collect())
     );
     
-    let parsed = fun.parse("fn test(a,b,c)", ()).unwrap().1;
+    let parsed = fun.parse("fn test(a,b,c)",&mut ()).unwrap().1;
     println!("Parsed: {:#?}", parsed);
-    let printed = fun.print(parsed, ()).unwrap();
+    let printed = fun.print(parsed, &mut ()).unwrap();
     println!("Printed: {}", printed);
 }
 
