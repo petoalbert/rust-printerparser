@@ -139,7 +139,7 @@ pub fn as_string<S>(
 
 pub trait PrinterParserOps<S, A>
 where
-    Self: PrinterParser<S, A>,
+    Self: PrinterParser<S, A> + Clone,
 {
     fn filter<F: Fn(&A) -> bool>(self, predicate: F) -> Filter<S, A, F, Self>
     where
@@ -212,7 +212,7 @@ where
 
 // PrinterParser trait
 
-pub trait PrinterParser<S, A>: Clone {
+pub trait PrinterParser<S, A> {
     fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String>;
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String>;
@@ -242,7 +242,7 @@ pub struct Alt<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> Clone for Alt<S, A, B, PA, PB> {
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone for Alt<S, A, B, PA, PB> {
     fn clone(&self) -> Self {
         Alt {
             a: self.a.clone(),
@@ -258,7 +258,7 @@ pub struct Filter<S, A, F: Fn(&A) -> bool, P: PrinterParser<S, A>> {
     phantom: PhantomData<(A, S)>,
 }
 
-impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> Clone for Filter<S, A, F, P> {
+impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A> + Clone> Clone for Filter<S, A, F, P> {
     fn clone(&self) -> Self {
         Filter {
             parser: self.parser.clone(),
@@ -275,7 +275,7 @@ pub struct Map<S, A, B, F: Fn(A) -> B, G: Fn(&B) -> A, P: PrinterParser<S, A> + 
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A> + Sized> Clone
+impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A> + Sized + Clone> Clone
     for Map<S, A, B, F, G, P>
 {
     fn clone(&self) -> Self {
@@ -308,7 +308,7 @@ impl<
         B,
         F: Fn(A) -> Result<B, String> + Clone,
         G: Fn(&B) -> Result<A, String> + Clone,
-        P: PrinterParser<S, A> + Sized,
+        P: PrinterParser<S, A> + Sized + Clone,
     > Clone for MapResult<S, A, B, F, G, P>
 {
     fn clone(&self) -> Self {
@@ -336,7 +336,7 @@ pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> Clone for ZipWith<S, A, B, PA, PB> {
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone for ZipWith<S, A, B, PA, PB> {
     fn clone(&self) -> Self {
         ZipWith {
             a: self.a.clone(),
@@ -351,7 +351,7 @@ pub struct Rep<S, A, P: PrinterParser<S, A>> {
     phantom: PhantomData<(A, S)>,
 }
 
-impl<S, A, P: PrinterParser<S, A>> Clone for Rep<S, A, P> {
+impl<S, A, P: PrinterParser<S, A> + Clone> Clone for Rep<S, A, P> {
     fn clone(&self) -> Self {
         Rep {
             parser: self.parser.clone(),
@@ -389,7 +389,7 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, Either<A, B>>
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> PrinterParserOps<S, Either<A, B>>
     for Alt<S, A, B, PA, PB>
 {
 }
@@ -434,7 +434,7 @@ impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParser<S, A
     }
 }
 
-impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParserOps<S, A>
+impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, A>
     for Filter<S, A, F, P>
 {
 }
@@ -489,7 +489,7 @@ impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S,
     }
 }
 
-impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A>>
+impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A> + Clone>
     PrinterParserOps<S, B> for Map<S, A, B, F, G, P>
 {
 }
@@ -521,7 +521,7 @@ impl<
         B,
         F: Fn(A) -> Result<B, String> + Clone,
         G: Fn(&B) -> Result<A, String> + Clone,
-        P: PrinterParser<S, A>,
+        P: PrinterParser<S, A> + Clone,
     > PrinterParserOps<S, B> for MapResult<S, A, B, F, G, P>
 {
 }
@@ -544,7 +544,7 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (A, B)>
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> PrinterParserOps<S, (A, B)>
     for ZipWith<S, A, B, PA, PB>
 {
 }
@@ -574,7 +574,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rep<S, A,
     }
 }
 
-impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rep<S, A, P> {}
+impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> for Rep<S, A, P> {}
 
 #[cfg(test)]
 mod tests {
