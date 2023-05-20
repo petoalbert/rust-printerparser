@@ -242,7 +242,9 @@ pub struct Alt<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone for Alt<S, A, B, PA, PB> {
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone
+    for Alt<S, A, B, PA, PB>
+{
     fn clone(&self) -> Self {
         Alt {
             a: self.a.clone(),
@@ -275,8 +277,14 @@ pub struct Map<S, A, B, F: Fn(A) -> B, G: Fn(&B) -> A, P: PrinterParser<S, A> + 
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A> + Sized + Clone> Clone
-    for Map<S, A, B, F, G, P>
+impl<
+        S,
+        A,
+        B,
+        F: Fn(A) -> B + Clone,
+        G: Fn(&B) -> A + Clone,
+        P: PrinterParser<S, A> + Sized + Clone,
+    > Clone for Map<S, A, B, F, G, P>
 {
     fn clone(&self) -> Self {
         Map {
@@ -336,7 +344,9 @@ pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone for ZipWith<S, A, B, PA, PB> {
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone
+    for ZipWith<S, A, B, PA, PB>
+{
     fn clone(&self) -> Self {
         ZipWith {
             a: self.a.clone(),
@@ -389,8 +399,8 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> PrinterParserOps<S, Either<A, B>>
-    for Alt<S, A, B, PA, PB>
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone>
+    PrinterParserOps<S, Either<A, B>> for Alt<S, A, B, PA, PB>
 {
 }
 
@@ -544,8 +554,8 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> PrinterParserOps<S, (A, B)>
-    for ZipWith<S, A, B, PA, PB>
+impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone>
+    PrinterParserOps<S, (A, B)> for ZipWith<S, A, B, PA, PB>
 {
 }
 
