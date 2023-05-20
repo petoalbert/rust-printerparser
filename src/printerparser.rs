@@ -14,45 +14,45 @@ to print/parse to overcome that limitation, just like parserz does.
 pub const ANY_CHAR: ConsumeChar = ConsumeChar;
 
 #[allow(dead_code)]
-pub fn digit<S>() -> impl PrinterParser<S, char> {
+pub fn digit<S>() -> impl PrinterParserOps<S, char> {
     ANY_CHAR.filter(|c| c.is_digit(10))
 }
 
 #[allow(dead_code)]
-pub fn char<S>(c: char) -> impl PrinterParser<S, ()> {
+pub fn char<S>(c: char) -> impl PrinterParserOps<S, ()> {
     ANY_CHAR.filter(move |x| x == &c).map(|_| (), move |_| c)
 }
 
-pub fn bytes<S>(count: usize) -> impl PrinterParser<S, Vec<u8>> {
+pub fn bytes<S>(count: usize) -> impl PrinterParserOps<S, Vec<u8>> {
     ConsumeBytes(count)
 }
 
-pub fn string<'a, S>(s: &'a str) -> impl PrinterParser<S, ()> + 'a {
+pub fn string<'a, S>(s: &'a str) -> impl PrinterParserOps<S, ()> + 'a {
     ExpectString(s.as_bytes())
 }
 
-pub fn preceded_by<S, A: Clone, PA: PrinterParser<S, A>, PU: PrinterParser<S, ()>>(
+pub fn preceded_by<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParserOps<S, ()>>(
     before: PU,
     parser: PA,
-) -> impl PrinterParser<S, A> {
+) -> impl PrinterParserOps<S, A> {
     before
         .zip_with(parser)
         .map(|(_, a)| a, |a| ((), (*a).clone()))
 }
 
-pub fn followed_by<S, A: Clone, PA: PrinterParser<S, A>, PU: PrinterParser<S, ()>>(
+pub fn followed_by<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParserOps<S, ()>>(
     parser: PA,
     after: PU,
-) -> impl PrinterParser<S, A> {
+) -> impl PrinterParserOps<S, A> {
     parser
         .zip_with(after)
         .map(|(a, _)| a, |a| ((*a).clone(), ()))
 }
 
 #[allow(dead_code)]
-pub fn many1<S, A: Clone, PA: PrinterParser<S, A>>(
+pub fn many1<S, A: Clone, PA: PrinterParserOps<S, A>>(
     combinator: PA,
-) -> impl PrinterParser<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, LinkedList<A>> {
     let c2 = combinator.clone();
 
     combinator.zip_with(c2.repeat().clone()).map_result(
@@ -69,10 +69,10 @@ pub fn many1<S, A: Clone, PA: PrinterParser<S, A>>(
 }
 
 #[allow(dead_code)]
-pub fn take_while<S, A, PA: PrinterParser<S, A>, F: Fn(&A) -> bool + Clone>(
+pub fn take_while<S, A, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone>(
     parser: PA,
     predicate: F,
-) -> impl PrinterParser<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, LinkedList<A>> {
     parser.filter(predicate).repeat()
 }
 
@@ -81,14 +81,14 @@ pub fn separated_by<
     S,
     A: Clone,
     B: Clone,
-    PA: PrinterParser<S, A>,
-    PB: PrinterParser<S, B>,
-    PU: PrinterParser<S, ()>,
+    PA: PrinterParserOps<S, A>,
+    PB: PrinterParserOps<S, B>,
+    PU: PrinterParserOps<S, ()>,
 >(
     a: PA,
     sep: PU,
     b: PB,
-) -> impl PrinterParser<S, (A, B)> {
+) -> impl PrinterParserOps<S, (A, B)> {
     a.zip_with(sep).zip_with(b).map(
         |((a, _), b)| (a, b),
         |(a, b)| (((*a).clone(), ()), (*b).clone()),
@@ -98,21 +98,21 @@ pub fn separated_by<
 pub fn surrounded_by<
     S,
     A: Clone,
-    PA: PrinterParser<S, A>,
-    PU1: PrinterParser<S, ()>,
-    PU2: PrinterParser<S, ()>,
+    PA: PrinterParserOps<S, A>,
+    PU1: PrinterParserOps<S, ()>,
+    PU2: PrinterParserOps<S, ()>,
 >(
     before: PU1,
     parser: PA,
     after: PU2,
-) -> impl PrinterParser<S, A> {
+) -> impl PrinterParserOps<S, A> {
     followed_by(preceded_by(before, parser), after)
 }
 
-pub fn separated_list<S, A: Clone, PA: PrinterParser<S, A>, PU: PrinterParser<S, ()>>(
+pub fn separated_list<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParserOps<S, ()>>(
     parser: PA,
     sep: PU,
-) -> impl PrinterParser<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, LinkedList<A>> {
     let successors = preceded_by(sep, parser.clone()).repeat();
     parser.zip_with(successors).map_result(
         |(v, mut vs)| {
@@ -128,36 +128,19 @@ pub fn separated_list<S, A: Clone, PA: PrinterParser<S, A>, PU: PrinterParser<S,
 }
 
 // TODO make this somehow part of the PrinterParser trait using 'where A: IntoIterator<Char>'
-pub fn as_string<S>(p: impl PrinterParser<S, LinkedList<char>>) -> impl PrinterParser<S, String> {
+pub fn as_string<S>(
+    p: impl PrinterParserOps<S, LinkedList<char>>,
+) -> impl PrinterParserOps<S, String> {
     p.map(
         |cs| cs.into_iter().collect(),
         |s: &String| s.chars().collect(),
     )
 }
 
-// PrinterParser trait
-
-pub trait PrinterParser<S, A>: Clone {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String>;
-
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String>;
-
-    fn print(&self, i: A, s: &mut S) -> Result<String, String> {
-        self.write(i, s).and_then(|bytes| {
-            std::str::from_utf8(&bytes)
-                .map(|s| s.to_owned())
-                .map_err(|e| format!("{}", e))
-        })
-    }
-
-    fn parse<'a>(&self, i: &'a str, s: &mut S) -> Result<(&'a str, A), String> {
-        self.read(i.as_bytes(), s).and_then(|(rem, a)| {
-            std::str::from_utf8(rem)
-                .map_err(|e| format!("{}", e))
-                .map(|s| (s, a))
-        })
-    }
-
+pub trait PrinterParserOps<S, A>
+where
+    Self: PrinterParser<S, A>,
+{
     fn filter<F: Fn(&A) -> bool>(self, predicate: F) -> Filter<S, A, F, Self>
     where
         Self: Sized,
@@ -224,6 +207,30 @@ pub trait PrinterParser<S, A>: Clone {
             b: other,
             phantom: PhantomData,
         }
+    }
+}
+
+// PrinterParser trait
+
+pub trait PrinterParser<S, A>: Clone {
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String>;
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String>;
+
+    fn print(&self, i: A, s: &mut S) -> Result<String, String> {
+        self.write(i, s).and_then(|bytes| {
+            std::str::from_utf8(&bytes)
+                .map(|s| s.to_owned())
+                .map_err(|e| format!("{}", e))
+        })
+    }
+
+    fn parse<'a>(&self, i: &'a str, s: &mut S) -> Result<(&'a str, A), String> {
+        self.read(i.as_bytes(), s).and_then(|(rem, a)| {
+            std::str::from_utf8(rem)
+                .map_err(|e| format!("{}", e))
+                .map(|s| (s, a))
+        })
     }
 }
 
@@ -382,6 +389,11 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, Either<A, B>>
+    for Alt<S, A, B, PA, PB>
+{
+}
+
 impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
     fn write(&self, _: (), s: &mut S) -> Result<Vec<u8>, String> {
         Ok(self.0.to_vec())
@@ -403,6 +415,8 @@ impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
     }
 }
 
+impl<'a, S> PrinterParserOps<S, ()> for ExpectString<'a> {}
+
 impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParser<S, A>
     for Filter<S, A, F, P>
 {
@@ -418,6 +432,11 @@ impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParser<S, A
             Err("Filter predicate didn't match".to_owned())
         }
     }
+}
+
+impl<S, A, F: Fn(&A) -> bool + Clone, P: PrinterParser<S, A>> PrinterParserOps<S, A>
+    for Filter<S, A, F, P>
+{
 }
 
 impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
@@ -437,6 +456,8 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
     }
 }
 
+impl<S> PrinterParserOps<S, Vec<u8>> for ConsumeBytes {}
+
 impl<S> PrinterParser<S, char> for ConsumeChar {
     fn write(&self, i: char, s: &mut S) -> Result<Vec<u8>, String> {
         Ok(i.to_string().bytes().collect())
@@ -452,6 +473,8 @@ impl<S> PrinterParser<S, char> for ConsumeChar {
     }
 }
 
+impl<S> PrinterParserOps<S, char> for ConsumeChar {}
+
 impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A>>
     PrinterParser<S, B> for Map<S, A, B, F, G, P>
 {
@@ -464,6 +487,11 @@ impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S,
         let (rem, a) = self.parser.read(i, s)?;
         Ok((rem, (self.f)(a)))
     }
+}
+
+impl<S, A, B, F: Fn(A) -> B + Clone, G: Fn(&B) -> A + Clone, P: PrinterParser<S, A>>
+    PrinterParserOps<S, B> for Map<S, A, B, F, G, P>
+{
 }
 
 impl<
@@ -487,6 +515,17 @@ impl<
     }
 }
 
+impl<
+        S,
+        A,
+        B,
+        F: Fn(A) -> Result<B, String> + Clone,
+        G: Fn(&B) -> Result<A, String> + Clone,
+        P: PrinterParser<S, A>,
+    > PrinterParserOps<S, B> for MapResult<S, A, B, F, G, P>
+{
+}
+
 impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S, (A, B)>
     for ZipWith<S, A, B, PA, PB>
 {
@@ -503,6 +542,11 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
         let (rem2, b) = self.b.read(rem1, s)?;
         Ok((rem2, (a, b)))
     }
+}
+
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (A, B)>
+    for ZipWith<S, A, B, PA, PB>
+{
 }
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rep<S, A, P> {
@@ -529,6 +573,8 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rep<S, A,
         Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
     }
 }
+
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rep<S, A, P> {}
 
 #[cfg(test)]
 mod tests {
