@@ -320,6 +320,13 @@ pub fn take_while<S, A, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone>(
     parser.filter(predicate).repeat()
 }
 
+pub fn take_till<S, A, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone>(
+    parser: PA,
+    predicate: F,
+) -> impl PrinterParserOps<S, LinkedList<A>> {
+    parser.filter(move |a| !predicate(a)).repeat()
+}
+
 #[allow(dead_code)]
 pub fn separated_by<
     S,
@@ -1048,6 +1055,19 @@ mod tests {
             Ok(("aaaa", result)) => assert_eq!(result, LinkedList::new()),
             v => panic!("Unexpected value {:?}", v),
         }
+    }
+
+    #[test]
+    fn test_take_till() {
+        let grammar = take_till(ANY_CHAR, |a| a.is_ascii_punctuation());
+        let (rest, result) = grammar.parse("shut! up", &mut ()).unwrap();
+        let mut list = LinkedList::new();
+        list.extend(vec!['s', 'h', 'u', 't']);
+        assert_eq!(rest, "! up");
+        assert_eq!(result, list);
+
+        let printed = grammar.print(list, &mut ()).unwrap();
+        assert_eq!(printed, "shut")
     }
 
     #[test]

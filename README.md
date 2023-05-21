@@ -8,5 +8,5 @@
 - [x] combinator::{complete, map} - incomplete parses are automatically errors here (feature or bug? you tell me)
 - [x] bytes::complete::take_while
 - [x] bytes::complete::tag
-- [ ] bytes::complete::take_till
-- [ ] bytes::complete::take_until
+- [x] bytes::complete::take_till
+- [ ] bytes::complete::take_until - overlaps with `take_till`?
