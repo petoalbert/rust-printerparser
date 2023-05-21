@@ -290,7 +290,7 @@ pub fn followed_by<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParserOps
 }
 
 #[allow(dead_code)]
-pub fn many1<S, A: Clone, PA: PrinterParserOps<S, A>>(
+pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
     combinator: PA,
 ) -> impl PrinterParserOps<S, LinkedList<A>> {
     let c2 = combinator.clone();
@@ -878,7 +878,7 @@ mod tests {
 
     #[test]
     fn test_many1() {
-        let grammar = many1(string("rust"));
+        let grammar = repeat1(string("rust"));
         let values = vec![(), ()];
         let mut list_for_parse = LinkedList::new();
 

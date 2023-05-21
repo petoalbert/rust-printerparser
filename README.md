@@ -4,6 +4,6 @@
 - [ ] bytes::complete::{tag, take_till, take_until, take_while},
 - [ ] combinator::{complete, map},
 - [ ] multi::count
-- [ ] multi::{many0, many1},
+- [x] multi::{many0, many1} - `repeat`, `repeat1` here
 - [ ] sequence::delimited - this is essentially between from parsec
 - [ ] sequence::terminated
