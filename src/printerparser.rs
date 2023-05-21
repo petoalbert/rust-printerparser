@@ -961,7 +961,10 @@ mod tests {
 
         let mut list = LinkedList::new();
         list.extend(vec!['1', '2', '3']);
-        assert_eq!(result, list)
+        assert_eq!(result, list);
+
+        let printed = grammar.print(list, &mut ()).unwrap();
+        assert_eq!(printed, "123")
     }
 
     #[test]
