@@ -271,6 +271,10 @@ pub fn string<'a, S>(s: &'a str) -> impl PrinterParserOps<S, ()> + 'a {
     ExpectString(s.as_bytes())
 }
 
+pub fn tag<'a, S>(bs: &'a [u8]) -> impl PrinterParserOps<S, ()> + 'a {
+    ExpectString(bs)
+}
+
 pub fn preceded_by<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParserOps<S, ()>>(
     before: PU,
     parser: PA,
@@ -900,7 +904,27 @@ mod tests {
             Ok((" there", ()))
         ));
 
-        assert_eq!(string("hello").print((), &mut ()).unwrap(), "hello")
+        assert_eq!(string("hello").print((), &mut ()).unwrap(), "hello");
+
+        assert!(matches!(
+            string("hello").parse("general kenobi", &mut ()),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    fn test_tag() {
+        assert!(matches!(
+            tag(b"hello").read(b"hello there", &mut ()),
+            Ok((b" there", ()))
+        ));
+
+        assert_eq!(tag(b"hello").write((), &mut ()).unwrap(), b"hello");
+
+        assert!(matches!(
+            tag(b"hello").read(b"general kenobi", &mut ()),
+            Err(_)
+        ));
     }
 
     #[test]
