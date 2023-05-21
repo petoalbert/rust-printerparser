@@ -145,6 +145,11 @@ pub fn be_f64<S>() -> impl PrinterParserOps<S, f64> {
 
 // endianness-independent number types
 
+pub enum Endianness {
+    BigEndindan,
+    LittleEndian,
+}
+
 pub fn i8() -> impl PrinterParserOps<Endianness, i8> {
     map_state(|e| match e {
         Endianness::BigEndindan => Box::new(be_i8()),
@@ -246,11 +251,6 @@ impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> PrinterParser<S, A>
 impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, A>
     for MapState<S, A, F>
 {
-}
-
-pub enum Endianness {
-    BigEndindan,
-    LittleEndian,
 }
 
 #[allow(dead_code)]
@@ -441,6 +441,17 @@ where
         }
     }
 
+    fn count(self, times: usize) -> Count<S, A, Self>
+    where
+        Self: Sized,
+    {
+        Count {
+            times: times,
+            parser: self.clone(),
+            phantom: PhantomData,
+        }
+    }
+
     fn or<B, PB: PrinterParser<S, B>>(self, other: PB) -> Alt<S, A, B, Self, PB> {
         Alt {
             a: self,
@@ -610,6 +621,22 @@ impl<S, A, P: PrinterParser<S, A> + Clone> Clone for Rep<S, A, P> {
     }
 }
 
+pub struct Count<S, A, P: PrinterParser<S, A>> {
+    times: usize,
+    parser: P,
+    phantom: PhantomData<(A, S)>,
+}
+
+impl<S, A, P: PrinterParser<S, A> + Clone> Clone for Count<S, A, P> {
+    fn clone(&self) -> Self {
+        Count {
+            times: self.times,
+            parser: self.parser.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Either<A, B> {
     Left(A),
@@ -695,7 +722,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
-        if (i.len() < self.0.into()) {
+        if i.len() < self.0.into() {
             Err("input has not enough elements left".to_owned())
         } else {
             Ok((
@@ -826,6 +853,35 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rep<S, A,
 
 impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> for Rep<S, A, P> {}
 
+impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Count<S, A, P> {
+    fn write(&self, x: LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
+        x.into_iter()
+            .map(|item| (self.parser).write(item, s))
+            .collect::<Result<Vec<Vec<u8>>, String>>()
+            .map(|vs| vs.concat()) // TODO bad performance
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], LinkedList<A>), String> {
+        let mut elements = LinkedList::new();
+        let mut rem = i;
+
+        for _ in 0..self.times {
+            let res = self.parser.read(rem, s);
+            match res {
+                Err(_) => return Err("count".to_owned()),
+                Ok((rem1, a)) => {
+                    rem = rem1;
+                    elements.push_front(a);
+                }
+            }
+        }
+
+        Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
+    }
+}
+
+impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> for Count<S, A, P> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,7 +933,7 @@ mod tests {
     }
 
     #[test]
-    fn test_many1() {
+    fn test_repeat1() {
         let grammar = repeat1(string("rust"));
         let values = vec![(), ()];
         let mut list_for_parse = LinkedList::new();
@@ -894,6 +950,38 @@ mod tests {
         list_for_parse2.extend(values);
 
         assert!(matches!(grammar.parse("", &mut ()), Err(_)))
+    }
+
+    #[test]
+    fn test_count_ok() {
+        let grammar = digit().count(3);
+
+        let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
+        assert_eq!(rest, "hello");
+
+        let mut list = LinkedList::new();
+        list.extend(vec!['1', '2', '3']);
+        assert_eq!(result, list)
+    }
+
+    #[test]
+    fn test_count_not_enough() {
+        let grammar = digit().count(5);
+
+        let result = grammar.parse("123hello", &mut ());
+        assert!(matches!(result, Err(_)));
+    }
+
+    #[test]
+    fn test_count_too_many() {
+        let grammar = digit().count(2);
+
+        let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
+        assert_eq!(rest, "3hello");
+
+        let mut list = LinkedList::new();
+        list.extend(vec!['1', '2']);
+        assert_eq!(result, list)
     }
 
     #[test]
