@@ -13,6 +13,72 @@ to print/parse to overcome that limitation, just like parserz does.
 
 pub const ANY_CHAR: ConsumeChar = ConsumeChar;
 
+pub fn i32_le<S>() -> impl PrinterParserOps<S, i32> {
+    bytes(4).map(
+        |b| i32::from_le_bytes(b.try_into().unwrap()),
+        |&i| i.to_le_bytes().to_vec(),
+    )
+}
+
+pub fn i32_be<S>() -> impl PrinterParserOps<S, i32> {
+    bytes(4).map(
+        |b| i32::from_be_bytes(b.try_into().unwrap()),
+        |&i| i.to_be_bytes().to_vec(),
+    )
+}
+
+pub fn map_state<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone>(
+    f: F,
+) -> impl PrinterParserOps<S, A> {
+    MapState {
+        f: f,
+        phantom: PhantomData,
+    }
+}
+
+pub fn i32() -> impl PrinterParserOps<Endianness, i32> {
+    map_state(|e| match e {
+        Endianness::BigEndindan => Box::new(i32_be()),
+        Endianness::LittleEndian => Box::new(i32_le()),
+    })
+}
+
+struct MapState<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> {
+    f: F,
+    phantom: PhantomData<(S, A)>,
+}
+
+impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone> Clone for MapState<S, A, F> {
+    fn clone(&self) -> Self {
+        MapState {
+            f: self.f.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> PrinterParser<S, A>
+    for MapState<S, A, F>
+{
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+        (self.f)(s).write(i, s)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
+        (self.f)(s).read(i, s)
+    }
+}
+
+impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, A>
+    for MapState<S, A, F>
+{
+}
+
+pub enum Endianness {
+    BigEndindan,
+    LittleEndian,
+}
+
 #[allow(dead_code)]
 pub fn digit<S>() -> impl PrinterParserOps<S, char> {
     ANY_CHAR.filter(|c| c.is_digit(10))
@@ -694,4 +760,25 @@ mod tests {
             v => panic!("Unexpected value {:?}", v),
         }
     }
+
+    #[test]
+    fn test_i32() {
+        let bytes: [u8; 4] = [1, 2, 3, 4]; // 1 + 2*2^8 + 3*2^16 + 4*2^24 4 + 3*2^8 + 2*2^16 + 2^24
+
+        let (_, i_le) = i32().read(&bytes, &mut Endianness::LittleEndian).unwrap();
+        let (_, i_be) = i32().read(&bytes, &mut Endianness::BigEndindan).unwrap();
+        let bytes_le = i32().write(i_le, &mut Endianness::LittleEndian).unwrap();
+        let bytes_be = i32().write(i_be, &mut Endianness::BigEndindan).unwrap();
+
+        assert_eq!(i_le, 67_305_985);
+        assert_eq!(i_be, 16_909_060);
+        assert_eq!(bytes_le, bytes);
+        assert_eq!(bytes_be, bytes);
+    }
+
+    #[derive(Clone)]
+    struct TestState {
+        a: bool,
+    }
+
 }
