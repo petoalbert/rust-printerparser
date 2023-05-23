@@ -144,7 +144,7 @@ pub fn be_f64<S>() -> impl PrinterParserOps<S, f64> {
 }
 
 // endianness-independent number types
-
+#[derive(PartialEq, Debug)]
 pub enum Endianness {
     BigEndindan,
     LittleEndian,
@@ -300,11 +300,11 @@ pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
     let c2 = combinator.clone();
 
     combinator.zip_with(c2.repeat().clone()).map_result(
-        |(a, mut aa)| {
+        |(a, mut aa), _| {
             aa.push_front(a);
             return Ok(aa);
         },
-        |a| {
+        |a, _| {
             a.front()
                 .ok_or("At least one element required".to_owned())
                 .map(|front| (front.clone(), a.clone().split_off(1)))
@@ -366,11 +366,11 @@ pub fn separated_list<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParser
 ) -> impl PrinterParserOps<S, LinkedList<A>> {
     let successors = preceded_by(sep, parser.clone()).repeat();
     parser.zip_with(successors).map_result(
-        |(v, mut vs)| {
+        |(v, mut vs), _| {
             vs.push_front(v);
             Ok(vs)
         },
-        |a| {
+        |a, _| {
             a.front()
                 .ok_or("At least one element required".to_owned())
                 .map(|front| (front.clone(), a.clone().split_off(1)))
@@ -415,7 +415,11 @@ where
         }
     }
 
-    fn map_result<B, F: Fn(A) -> Result<B, String>, G: Fn(&B) -> Result<A, String>>(
+    fn map_result<
+        B,
+        F: Fn(A, &mut S) -> Result<B, String>,
+        G: Fn(&B, &mut S) -> Result<A, String>,
+    >(
         self,
         f: F,
         g: G,
@@ -562,8 +566,8 @@ pub struct MapResult<
     S,
     A,
     B,
-    F: Fn(A) -> Result<B, String>,
-    G: Fn(&B) -> Result<A, String>,
+    F: Fn(A, &mut S) -> Result<B, String>,
+    G: Fn(&B, &mut S) -> Result<A, String>,
     P: PrinterParser<S, A> + Sized,
 > {
     parser: P,
@@ -576,8 +580,8 @@ impl<
         S,
         A,
         B,
-        F: Fn(A) -> Result<B, String> + Clone,
-        G: Fn(&B) -> Result<A, String> + Clone,
+        F: Fn(A, &mut S) -> Result<B, String> + Clone,
+        G: Fn(&B, &mut S) -> Result<A, String> + Clone,
         P: PrinterParser<S, A> + Sized + Clone,
     > Clone for MapResult<S, A, B, F, G, P>
 {
@@ -786,19 +790,19 @@ impl<
         S,
         A,
         B,
-        F: Fn(A) -> Result<B, String> + Clone,
-        G: Fn(&B) -> Result<A, String> + Clone,
+        F: Fn(A, &mut S) -> Result<B, String> + Clone,
+        G: Fn(&B, &mut S) -> Result<A, String> + Clone,
         P: PrinterParser<S, A>,
     > PrinterParser<S, B> for MapResult<S, A, B, F, G, P>
 {
     fn write(&self, i: B, s: &mut S) -> Result<Vec<u8>, String> {
-        let o = (self.g)(&i)?;
+        let o = (self.g)(&i, s)?;
         self.parser.write(o, s)
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], B), String> {
         let (rem, a) = self.parser.read(i, s)?;
-        let mapped = (self.f)(a)?;
+        let mapped = (self.f)(a, s)?;
         Ok((rem, mapped))
     }
 }
@@ -807,8 +811,8 @@ impl<
         S,
         A,
         B,
-        F: Fn(A) -> Result<B, String> + Clone,
-        G: Fn(&B) -> Result<A, String> + Clone,
+        F: Fn(A, &mut S) -> Result<B, String> + Clone,
+        G: Fn(&B, &mut S) -> Result<A, String> + Clone,
         P: PrinterParser<S, A> + Clone,
     > PrinterParserOps<S, B> for MapResult<S, A, B, F, G, P>
 {
@@ -1085,8 +1089,37 @@ mod tests {
         assert_eq!(bytes_be, bytes);
     }
 
-    #[derive(Clone)]
-    struct TestState {
-        a: bool,
+    #[test]
+    fn test_state() {
+        let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
+        let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
+
+        let endianness = bytes(1).map_result(
+            |bs, s: &mut Endianness| match bs.first().unwrap() {
+                0 => {
+                    *s = Endianness::LittleEndian;
+                    Ok(())
+                }
+                1 => {
+                    *s = Endianness::BigEndindan;
+                    Ok(())
+                }
+                _ => Err("Unreadable endianness".to_owned()),
+            },
+            |_, s: &mut Endianness| match s {
+                Endianness::LittleEndian => Ok([0].to_vec()),
+                Endianness::BigEndindan => Ok([1].to_vec()),
+            },
+        );
+
+        let grammar = preceded_by(endianness, i32());
+
+        let mut parsed_state = Endianness::LittleEndian;
+        let (_, i) = grammar.read(&be_bytes, &mut parsed_state).unwrap();
+        let result_bytes = grammar.write(i, &mut Endianness::LittleEndian).unwrap();
+
+        assert_eq!(parsed_state, Endianness::BigEndindan);
+        assert_eq!(i, 67_305_985);
+        assert_eq!(result_bytes, le_bytes);
     }
 }
