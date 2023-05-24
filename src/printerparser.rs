@@ -467,7 +467,7 @@ where
         }
     }
 
-    fn or<B, PB: PrinterParser<S, B>>(self, other: PB) -> Alt<S, A, B, Self, PB> {
+    fn or<PB: PrinterParser<S, A>>(self, other: PB) -> Alt<S, A, Self, PB> {
         Alt {
             a: self,
             b: other,
@@ -502,14 +502,50 @@ pub trait PrinterParser<S, A> {
 
 // Parser structs
 
-pub struct Alt<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
-    a: PA,
-    b: PB,
-    phantom: PhantomData<(A, B, S)>,
+pub struct Defer<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>> {
+    resolve: F,
+    phantom: PhantomData<(S, A)>,
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone
-    for Alt<S, A, B, PA, PB>
+impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> Clone for Defer<S, A, F> {
+    fn clone(&self) -> Self {
+        Defer {
+            resolve: self.resolve.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub fn defer<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>>(f: F) -> Defer<S, A, F> {
+    Defer {
+        resolve: f,
+        phantom: PhantomData,
+    }
+}
+
+impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, A>
+    for Defer<S, A, F>
+{
+}
+
+impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParser<S, A> for Defer<S, A, F> {
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+        (self.resolve)().write(i, s)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
+        (self.resolve)().read(i, s)
+    }
+}
+
+pub struct Alt<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> {
+    a: PA,
+    b: PB,
+    phantom: PhantomData<(A, S)>,
+}
+
+impl<S, A, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clone> Clone
+    for Alt<S, A, PA, PB>
 {
     fn clone(&self) -> Self {
         Alt {
@@ -652,37 +688,22 @@ impl<S, A, P: PrinterParser<S, A> + Clone> Clone for Count<S, A, P> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Either<A, B> {
-    Left(A),
-    Right(B),
-}
-
 // Parser implementations
 
-impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S, Either<A, B>>
-    for Alt<S, A, B, PA, PB>
+impl<S, A: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParser<S, A>
+    for Alt<S, A, PA, PB>
 {
-    fn write(&self, i: Either<A, B>, s: &mut S) -> Result<Vec<u8>, String> {
-        match i {
-            Either::Left(a) => self.a.write(a, s),
-            Either::Right(b) => self.b.write(b, s),
-        }
+    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+        self.a.write(i.clone(), s).or(self.b.write(i, s))
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Either<A, B>), String> {
-        match self.a.read(i, s) {
-            Ok((rem, a)) => Ok((rem, Either::Left(a))),
-            Err(_) => match self.b.read(i, s) {
-                Ok((rem, b)) => Ok((rem, Either::Right(b))),
-                Err(e) => Err(e),
-            },
-        }
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
+        self.a.read(i, s).or(self.b.read(i, s))
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone>
-    PrinterParserOps<S, Either<A, B>> for Alt<S, A, B, PA, PB>
+impl<S, A: Clone, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clone>
+    PrinterParserOps<S, A> for Alt<S, A, PA, PB>
 {
 }
 
@@ -756,6 +777,10 @@ impl<S> PrinterParser<S, char> for ConsumeChar {
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], char), String> {
+        if i.len() == 0 {
+            return Err("0 length input encountered".to_owned());
+        }
+
         std::str::from_utf8(&i[..1])
             .or_else(|_| std::str::from_utf8(&i[..2]))
             .or_else(|_| std::str::from_utf8(&i[..3]))
@@ -1026,20 +1051,11 @@ mod tests {
     fn test_or() {
         let grammar = string("rust").or(string("haskell"));
 
-        assert!(matches!(
-            grammar.parse("rust", &mut ()),
-            Ok(("", Either::Left(())))
-        ));
-        assert!(matches!(
-            grammar.parse("haskell", &mut ()),
-            Ok(("", Either::Right(())))
-        ));
+        assert!(matches!(grammar.parse("rust", &mut ()), Ok(("", ()))));
+        assert!(matches!(grammar.parse("haskell", &mut ()), Ok(("", ()))));
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
-        assert_eq!(grammar.print(Either::Left(()), &mut ()).unwrap(), "rust");
-        assert_eq!(
-            grammar.print(Either::Right(()), &mut ()).unwrap(),
-            "haskell"
-        );
+        assert_eq!(grammar.print((), &mut ()).unwrap(), "rust");
+        assert_eq!(grammar.print((), &mut ()).unwrap(), "haskell");
     }
 
     #[test]
