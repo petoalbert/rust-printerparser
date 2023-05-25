@@ -487,6 +487,19 @@ where
             |s: &String| s.chars().collect(),
         )
     }
+
+    fn as_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
+        self,
+        read_state: F,
+        write_state: G,
+    ) -> State<S, A, F, G, Self> {
+        State {
+            parser: self,
+            read_state: read_state,
+            write_state: write_state,
+            phantom: PhantomData,
+        }
+    }
 }
 
 // PrinterParser trait
@@ -514,6 +527,67 @@ pub trait PrinterParser<S, A> {
 }
 
 // Parser structs
+
+pub struct State<
+    S,
+    A,
+    F: Fn(A, &mut S) -> Result<(), String>,
+    G: Fn(&S) -> Result<A, String>,
+    P: PrinterParser<S, A>,
+> {
+    parser: P,
+    read_state: F,
+    write_state: G,
+    phantom: PhantomData<(S, A)>,
+}
+
+impl<
+        S,
+        A,
+        F: Fn(A, &mut S) -> Result<(), String> + Clone,
+        G: Fn(&S) -> Result<A, String> + Clone,
+        P: PrinterParser<S, A> + Clone,
+    > Clone for State<S, A, F, G, P>
+{
+    fn clone(&self) -> Self {
+        State {
+            parser: self.parser.clone(),
+            read_state: self.read_state.clone(),
+            write_state: self.write_state.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<
+        S,
+        A,
+        F: Fn(A, &mut S) -> Result<(), String>,
+        G: Fn(&S) -> Result<A, String>,
+        P: PrinterParser<S, A>,
+    > PrinterParser<S, ()> for State<S, A, F, G, P>
+{
+    fn write(&self, i: (), s: &mut S) -> Result<Vec<u8>, String> {
+        let a = (self.write_state)(s)?;
+        self.parser.write(a, s)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], ()), String> {
+        let (rem, a) = self.parser.read(i, s)?;
+        (self.read_state)(a, s)?;
+        Ok((rem, ()))
+    }
+}
+
+impl<
+        S,
+        A,
+        F: Fn(A, &mut S) -> Result<(), String> + Clone,
+        G: Fn(&S) -> Result<A, String> + Clone,
+        P: PrinterParser<S, A> + Clone,
+    > PrinterParserOps<S, ()> for State<S, A, F, G, P>
+{
+}
 
 pub struct Defer<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>> {
     resolve: F,
@@ -1008,7 +1082,7 @@ mod tests {
         let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
         let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
 
-        let endianness = bytes(1).map_result(
+        let endianness = bytes(1).as_state(
             |bs, s: &mut Endianness| match bs.first().unwrap() {
                 0 => {
                     *s = Endianness::LittleEndian;
@@ -1020,7 +1094,7 @@ mod tests {
                 }
                 _ => Err("Unreadable endianness".to_owned()),
             },
-            |_, s: &mut Endianness| match s {
+            |s: &Endianness| match s {
                 Endianness::LittleEndian => Ok([0].to_vec()),
                 Endianness::BigEndindan => Ok([1].to_vec()),
             },
