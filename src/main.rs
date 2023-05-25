@@ -14,11 +14,12 @@ enum JSON {
     Object(LinkedList<(String, JSON)>),
 }
 
-fn whitespace() -> impl PrinterParserOps<(), ()> {
+fn whitespace() -> impl PrinterParserOps<(), String> + DefaultValue<(), String> {
     ANY_CHAR
         .filter(|&c| c == ' ' || c == '\t' || c == '\n')
         .repeat()
-        .map(|_| (), |_| LinkedList::new())
+        .as_string()
+        .default("".to_owned())
 }
 
 fn parse_boolean() -> impl PrinterParserOps<(), JSON> {
@@ -62,7 +63,9 @@ fn parse_string() -> impl PrinterParserOps<(), JSON> {
     )
 }
 
-fn token<A: Clone, P: PrinterParserOps<(), A>>(p: P) -> impl PrinterParserOps<(), A> {
+fn token<A: Clone, P: PrinterParserOps<(), A> + DefaultValue<(), A>>(
+    p: P,
+) -> impl PrinterParserOps<(), A> + DefaultValue<(), A> {
     surrounded_by(whitespace(), p, whitespace())
 }
 
