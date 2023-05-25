@@ -29,22 +29,18 @@ fn parse_boolean() -> impl PrinterParserOps<(), JSON> {
 }
 
 fn parse_number() -> impl PrinterParserOps<(), JSON> {
-    repeat1(digit())
-        .map(
-            |digits| {
-                digits
-                    .into_iter()
-                    .fold(0i64, |acc, val| acc * 10 + val.to_digit(10).unwrap() as i64)
-            },
-            |n| n.to_string().chars().collect(),
-        )
-        .map_result(
-            |value, _| Ok(JSON::Number(value)),
-            |value, _| match value {
-                JSON::Number(n) => Ok(*n),
-                v => Err(format!("Unexpected value in number: {:#?}", v)),
-            },
-        )
+    repeat1(digit()).as_string().map_result(
+        |value, _| {
+            value
+                .parse::<i64>()
+                .map_err(|_| "Could not parse".to_owned())
+                .map(|v| JSON::Number(v))
+        },
+        |value, _| match value {
+            JSON::Number(v) => Ok(v.to_string()),
+            v => Err(format!("Unexpected value in number: {:#?}", v)),
+        },
+    )
 }
 
 fn parse_string_literal() -> impl PrinterParserOps<(), String> {
@@ -53,10 +49,7 @@ fn parse_string_literal() -> impl PrinterParserOps<(), String> {
         ANY_CHAR.filter(|c| *c != '"').repeat(),
         char('"'),
     )
-    .map(
-        |chars| chars.into_iter().collect::<String>(),
-        |string| string.chars().collect(),
-    )
+    .as_string()
 }
 
 fn parse_string() -> impl PrinterParserOps<(), JSON> {

@@ -379,16 +379,6 @@ pub fn separated_list<S, A: Clone, PA: PrinterParserOps<S, A>, PU: PrinterParser
     )
 }
 
-// TODO make this somehow part of the PrinterParser trait using 'where A: IntoIterator<Char>'
-pub fn as_string<S>(
-    p: impl PrinterParserOps<S, LinkedList<char>>,
-) -> impl PrinterParserOps<S, String> {
-    p.map(
-        |cs| cs.into_iter().collect(),
-        |s: &String| s.chars().collect(),
-    )
-}
-
 pub trait PrinterParserOps<S, A>
 where
     Self: PrinterParser<S, A> + Clone,
@@ -486,6 +476,16 @@ where
             b: other,
             phantom: PhantomData,
         }
+    }
+
+    fn as_string(self) -> MapResult<S, A, String, Self>
+    where
+        A: IntoIterator<Item = char> + FromIterator<char>,
+    {
+        self.map(
+            |cs| cs.into_iter().collect(),
+            |s: &String| s.chars().collect(),
+        )
     }
 }
 
