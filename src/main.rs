@@ -5,7 +5,7 @@ use std::collections::LinkedList;
 use crate::printerparser::PrinterParser;
 use printerparser::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum JSON {
     Boolean(bool),
     Number(i64),
@@ -134,4 +134,7 @@ fn main() {
     println!("{:?}", object_t);
 
     // TODO: fix printing
+
+    let printed = parse_json().print(object_t, &mut ()).unwrap();
+    println!("{:?}", printed)
 }

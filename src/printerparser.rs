@@ -549,12 +549,21 @@ where
         }
     }
 
-    fn as_value<B: Clone + 'static>(self, b: B) -> MapResult<S, A, B, Self>
+    fn as_value<B: Clone + PartialEq + 'static>(self, b: B) -> MapResult<S, A, B, Self>
     where
         Self: DefaultValue<S, A> + 'static,
     {
-        self.clone()
-            .map_result(move |_, _| Ok(b.clone()), move |_, s| self.value(s))
+        let cloned = b.clone();
+        self.clone().map_result(
+            move |_, _| Ok(cloned.clone()), // TODO
+            move |v, s| {
+                if *v == b {
+                    self.value(s)
+                } else {
+                    Err("Not matching".to_owned())
+                }
+            },
+        )
     }
 }
 
@@ -1078,10 +1087,7 @@ mod tests {
     fn test_preceded_by() {
         let grammar = preceded_by(char('*'), string("hello"));
         let expected = "hello".to_owned();
-        assert_eq!(
-            grammar.parse("*hello", &mut ()),
-            Ok(("", expected))
-        );
+        assert_eq!(grammar.parse("*hello", &mut ()), Ok(("", expected)));
         assert_eq!(
             string("*hello")
                 .print("*hello".to_owned(), &mut ())
