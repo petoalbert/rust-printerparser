@@ -1077,11 +1077,11 @@ mod tests {
     #[test]
     fn test_preceded_by() {
         let grammar = preceded_by(char('*'), string("hello"));
-        let expected = "*hello".to_owned();
-        assert!(matches!(
+        let expected = "hello".to_owned();
+        assert_eq!(
             grammar.parse("*hello", &mut ()),
             Ok(("", expected))
-        ));
+        );
         assert_eq!(
             string("*hello")
                 .print("*hello".to_owned(), &mut ())
