@@ -23,8 +23,8 @@ fn whitespace() -> impl PrinterParserOps<(), String> + DefaultValue<(), String> 
 }
 
 fn parse_boolean() -> impl PrinterParserOps<(), JSON> {
-    let parse_true = string("true").map(|_| JSON::Boolean(true), |_| ());
-    let parse_false = string("false").map(|_| JSON::Boolean(false), |_| ());
+    let parse_true = string("true").as_value(JSON::Boolean(true));
+    let parse_false = string("false").as_value(JSON::Boolean(false));
 
     parse_true.or(parse_false)
 }

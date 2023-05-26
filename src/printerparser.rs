@@ -268,12 +268,25 @@ pub fn bytes<S>(count: usize) -> impl PrinterParserOps<S, Vec<u8>> {
     ConsumeBytes(count)
 }
 
-pub fn string<'a, S>(s: &'a str) -> impl PrinterParserOps<S, ()> + 'a {
+pub fn string<'a, S: 'static>(
+    s: &'a str,
+) -> impl PrinterParserOps<S, String> + DefaultValue<S, String> + 'a {
     ExpectString(s.as_bytes())
+        .map_result(
+            |a, _| {
+                std::str::from_utf8(&a)
+                    .map_err(|e| format!("{}", e))
+                    .map(|s| s.to_owned())
+            },
+            |s, _| Ok(s.as_bytes().to_vec()),
+        )
+        .default(s.to_owned())
 }
 
-pub fn tag<'a, S>(bs: &'a [u8]) -> impl PrinterParserOps<S, ()> + 'a {
-    ExpectString(bs)
+pub fn tag<'a, S: 'static>(
+    bs: &'a [u8],
+) -> impl PrinterParserOps<S, Vec<u8>> + DefaultValue<S, Vec<u8>> + 'a {
+    ExpectString(bs).default(bs.to_vec())
 }
 
 pub fn preceded_by<
@@ -535,6 +548,14 @@ where
             phantom: PhantomData,
         }
     }
+
+    fn as_value<B: Clone + 'static>(self, b: B) -> MapResult<S, A, B, Self>
+    where
+        Self: DefaultValue<S, A> + 'static,
+    {
+        self.clone()
+            .map_result(move |_, _| Ok(b.clone()), move |_, s| self.value(s))
+    }
 }
 
 // PrinterParser trait
@@ -649,7 +670,7 @@ impl<
     > DefaultValue<S, ()> for State<S, A, F, G, P>
 {
     fn value(&self, s: &S) -> Result<(), String> {
-        self.value(s)
+        Ok(())
     }
 }
 
@@ -834,19 +855,23 @@ impl<S, A: Clone, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clo
 {
 }
 
-impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
-    fn write(&self, _: (), s: &mut S) -> Result<Vec<u8>, String> {
-        Ok(self.0.to_vec())
+impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
+    fn write(&self, v: Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+        if v == self.0 {
+            Ok(self.0.to_vec())
+        } else {
+            Err("Not matching".to_owned())
+        }
     }
 
-    fn read<'b>(&self, i: &'b [u8], s: &mut S) -> Result<(&'b [u8], ()), String> {
+    fn read<'b>(&self, i: &'b [u8], s: &mut S) -> Result<(&'b [u8], Vec<u8>), String> {
         if i.len() < self.0.len() {
             Err(format!("Cannot match {}, not enough input", "FIXME"))
         } else {
             let s = &i[..(self.0.len())];
             let remainder = &i[self.0.len()..];
             if s == self.0 {
-                Ok((remainder, ()))
+                Ok((remainder, s.to_vec()))
             } else {
                 Err(format!("Expected '{}' but received '{}'", "FIXME", "FIXME"))
                 // TODO
@@ -855,7 +880,7 @@ impl<'a, S> PrinterParser<S, ()> for ExpectString<'a> {
     }
 }
 
-impl<'a, S> PrinterParserOps<S, ()> for ExpectString<'a> {}
+impl<'a, S> PrinterParserOps<S, Vec<u8>> for ExpectString<'a> {}
 
 impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
     fn write(&self, i: Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
@@ -1013,12 +1038,16 @@ mod tests {
 
     #[test]
     fn test_string() {
+        let expected = "hello".to_owned();
         assert!(matches!(
             string("hello").parse("hello there", &mut ()),
-            Ok((" there", ()))
+            Ok((" there", expected))
         ));
 
-        assert_eq!(string("hello").print((), &mut ()).unwrap(), "hello");
+        assert_eq!(
+            string("hello").print("hello".to_owned(), &mut ()).unwrap(),
+            "hello"
+        );
 
         assert!(matches!(
             string("hello").parse("general kenobi", &mut ()),
@@ -1028,12 +1057,16 @@ mod tests {
 
     #[test]
     fn test_tag() {
+        let expected = b"hello".to_vec();
         assert!(matches!(
             tag(b"hello").read(b"hello there", &mut ()),
-            Ok((b" there", ()))
+            Ok((b" there", expected))
         ));
 
-        assert_eq!(tag(b"hello").write((), &mut ()).unwrap(), b"hello");
+        assert_eq!(
+            tag(b"hello").write(b"hello".to_vec(), &mut ()).unwrap(),
+            b"hello"
+        );
 
         assert!(matches!(
             tag(b"hello").read(b"general kenobi", &mut ()),
@@ -1044,15 +1077,24 @@ mod tests {
     #[test]
     fn test_preceded_by() {
         let grammar = preceded_by(char('*'), string("hello"));
-        assert!(matches!(grammar.parse("*hello", &mut ()), Ok(("", ()))));
-        assert_eq!(string("*hello").print((), &mut ()).unwrap(), "*hello")
+        let expected = "*hello".to_owned();
+        assert!(matches!(
+            grammar.parse("*hello", &mut ()),
+            Ok(("", expected))
+        ));
+        assert_eq!(
+            string("*hello")
+                .print("*hello".to_owned(), &mut ())
+                .unwrap(),
+            "*hello"
+        )
     }
 
     #[test]
     fn test_repeat() {
         let grammar = string("rust").repeat();
 
-        let values = vec![(), (), ()];
+        let values = vec!["rust".to_owned(), "rust".to_owned(), "rust".to_owned()];
         let mut list_for_parse = LinkedList::new();
 
         list_for_parse.extend(values);
@@ -1062,7 +1104,7 @@ mod tests {
             _ => panic!("Unexpected value"),
         }
 
-        let values = vec![(), ()];
+        let values = vec!["rust".to_owned(), "rust".to_owned()];
         let mut list_for_print = LinkedList::new();
 
         list_for_print.extend(values);
@@ -1073,7 +1115,7 @@ mod tests {
     #[test]
     fn test_repeat1() {
         let grammar = repeat1(string("rust"));
-        let values = vec![(), ()];
+        let values = vec!["rust".to_owned(), "rust".to_owned()];
         let mut list_for_parse = LinkedList::new();
 
         list_for_parse.extend(values);
@@ -1129,11 +1171,20 @@ mod tests {
     fn test_or() {
         let grammar = string("rust").or(string("haskell"));
 
-        assert!(matches!(grammar.parse("rust", &mut ()), Ok(("", ()))));
-        assert!(matches!(grammar.parse("haskell", &mut ()), Ok(("", ()))));
+        let parsed_rust = "rust".to_owned();
+        let parsed_haskell = "haskell".to_owned();
+
+        assert!(matches!(
+            grammar.parse("rust", &mut ()),
+            Ok(("", parsed_rust))
+        ));
+        assert!(matches!(
+            grammar.parse("haskell", &mut ()),
+            Ok(("", parsed_haskell))
+        ));
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
-        assert_eq!(grammar.print((), &mut ()).unwrap(), "rust");
-        assert_eq!(grammar.print((), &mut ()).unwrap(), "haskell");
+        assert_eq!(grammar.print(parsed_rust, &mut ()).unwrap(), "rust");
+        assert_eq!(grammar.print(parsed_haskell, &mut ()).unwrap(), "haskell");
     }
 
     #[test]
