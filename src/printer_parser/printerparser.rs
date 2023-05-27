@@ -12,207 +12,8 @@ to print/parse to overcome that limitation, just like parserz does.
 
 // Helper functions
 
-pub const ANY_CHAR: ConsumeChar = ConsumeChar;
-
-// little endian number types
-
-pub fn le_f32<S>() -> impl PrinterParserOps<S, f32> {
-    bytes(4).map(
-        |b| f32::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_f64<S>() -> impl PrinterParserOps<S, f64> {
-    bytes(4).map(
-        |b| f64::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_i8<S>() -> impl PrinterParserOps<S, i8> {
-    bytes(4).map(
-        |b| i8::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_i16<S>() -> impl PrinterParserOps<S, i16> {
-    bytes(4).map(
-        |b| i16::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_i32<S>() -> impl PrinterParserOps<S, i32> {
-    bytes(4).map(
-        |b| i32::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_i64<S>() -> impl PrinterParserOps<S, i64> {
-    bytes(4).map(
-        |b| i64::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_u16<S>() -> impl PrinterParserOps<S, u16> {
-    bytes(4).map(
-        |b| u16::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_u32<S>() -> impl PrinterParserOps<S, u32> {
-    bytes(4).map(
-        |b| u32::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-pub fn le_u64<S>() -> impl PrinterParserOps<S, u64> {
-    bytes(4).map(
-        |b| u64::from_le_bytes(b.try_into().unwrap()),
-        |&i| i.to_le_bytes().to_vec(),
-    )
-}
-
-// big endian number types
-
-pub fn be_i8<S>() -> impl PrinterParserOps<S, i8> {
-    bytes(4).map(
-        |b| i8::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_i16<S>() -> impl PrinterParserOps<S, i16> {
-    bytes(4).map(
-        |b| i16::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_i32<S>() -> impl PrinterParserOps<S, i32> {
-    bytes(4).map(
-        |b| i32::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_i64<S>() -> impl PrinterParserOps<S, i64> {
-    bytes(4).map(
-        |b| i64::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_u16<S>() -> impl PrinterParserOps<S, u16> {
-    bytes(4).map(
-        |b| u16::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_u32<S>() -> impl PrinterParserOps<S, u32> {
-    bytes(4).map(
-        |b| u32::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_u64<S>() -> impl PrinterParserOps<S, u64> {
-    bytes(4).map(
-        |b| u64::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_f32<S>() -> impl PrinterParserOps<S, f32> {
-    bytes(4).map(
-        |b| f32::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-pub fn be_f64<S>() -> impl PrinterParserOps<S, f64> {
-    bytes(4).map(
-        |b| f64::from_be_bytes(b.try_into().unwrap()),
-        |&i| i.to_be_bytes().to_vec(),
-    )
-}
-
-// endianness-independent number types
-#[derive(PartialEq, Debug)]
-pub enum Endianness {
-    BigEndindan,
-    LittleEndian,
-}
-
-pub fn i8() -> impl PrinterParserOps<Endianness, i8> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_i8()),
-        Endianness::LittleEndian => Box::new(le_i8()),
-    })
-}
-
-pub fn i16() -> impl PrinterParserOps<Endianness, i16> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_i16()),
-        Endianness::LittleEndian => Box::new(le_i16()),
-    })
-}
-
-pub fn i32() -> impl PrinterParserOps<Endianness, i32> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_i32()),
-        Endianness::LittleEndian => Box::new(le_i32()),
-    })
-}
-
-pub fn i64() -> impl PrinterParserOps<Endianness, i64> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_i64()),
-        Endianness::LittleEndian => Box::new(le_i64()),
-    })
-}
-
-pub fn u16() -> impl PrinterParserOps<Endianness, u16> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_u16()),
-        Endianness::LittleEndian => Box::new(le_u16()),
-    })
-}
-
-pub fn u32() -> impl PrinterParserOps<Endianness, u32> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_u32()),
-        Endianness::LittleEndian => Box::new(le_u32()),
-    })
-}
-
-pub fn u64() -> impl PrinterParserOps<Endianness, u64> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_u64()),
-        Endianness::LittleEndian => Box::new(le_u64()),
-    })
-}
-
-pub fn f32() -> impl PrinterParserOps<Endianness, f32> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_f32()),
-        Endianness::LittleEndian => Box::new(le_f32()),
-    })
-}
-
-pub fn f64() -> impl PrinterParserOps<Endianness, f64> {
-    map_state(|e| match e {
-        Endianness::BigEndindan => Box::new(be_f64()),
-        Endianness::LittleEndian => Box::new(le_f64()),
-    })
-}
+#[allow(non_upper_case_globals)]
+pub const consume_char: ConsumeChar = ConsumeChar;
 
 pub fn map_state<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone>(
     f: F,
@@ -254,16 +55,6 @@ impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserO
 {
 }
 
-#[allow(dead_code)]
-pub fn digit<S>() -> impl PrinterParserOps<S, char> {
-    ANY_CHAR.filter(|c| c.is_digit(10))
-}
-
-#[allow(dead_code)]
-pub fn char<S>(c: char) -> Default<S, char, MapResult<S, char, char, ConsumeChar>> {
-    ANY_CHAR.filter(move |x| x == &c).default(c)
-}
-
 pub fn bytes<S>(count: usize) -> impl PrinterParserOps<S, Vec<u8>> {
     ConsumeBytes(count)
 }
@@ -287,132 +78,6 @@ pub fn tag<'a, S: 'static>(
     bs: &'a [u8],
 ) -> impl PrinterParserOps<S, Vec<u8>> + DefaultValue<S, Vec<u8>> + 'a {
     ExpectString(bs).default(bs.to_vec())
-}
-
-pub fn preceded_by<
-    S,
-    A: Clone,
-    B,
-    PA: PrinterParserOps<S, A>,
-    PB: PrinterParserOps<S, B> + DefaultValue<S, B> + 'static,
->(
-    before: PB,
-    parser: PA,
-) -> MapResult<S, (B, A), A, ZipWith<S, B, A, PB, PA>> {
-    before.clone().zip_with(parser).map_result(
-        |(_, a), _state| Ok(a),
-        move |a, s| before.value(s).map(|b| (b, (*a).clone())),
-    )
-}
-
-pub fn followed_by<
-    S,
-    A: Clone,
-    B,
-    PA: PrinterParserOps<S, A>,
-    PB: PrinterParserOps<S, B> + DefaultValue<S, B> + 'static,
->(
-    parser: PA,
-    after: PB,
-) -> MapResult<S, (A, B), A, ZipWith<S, A, B, PA, PB>> {
-    parser.zip_with(after.clone()).map_result(
-        |(a, _), _| Ok(a),
-        move |a, s| after.value(s).map(|b| ((*a).clone(), b)),
-    )
-}
-
-#[allow(dead_code)]
-pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
-    combinator: PA,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
-    let c2 = combinator.clone();
-
-    combinator.zip_with(c2.repeat()).map_result(
-        |(a, mut aa), _| {
-            aa.push_front(a);
-            Ok(aa)
-        },
-        |a, _| {
-            a.front()
-                .ok_or("At least one element required".to_owned())
-                .map(|front| (front.clone(), a.clone().split_off(1)))
-        },
-    )
-}
-
-#[allow(dead_code)]
-pub fn take_while<S, A: Clone, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone + 'static>(
-    parser: PA,
-    predicate: F,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
-    parser.filter(predicate).repeat()
-}
-
-pub fn take_till<S, A: Clone, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone + 'static>(
-    parser: PA,
-    predicate: F,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
-    parser.filter(move |a| !predicate(a)).repeat()
-}
-
-#[allow(dead_code)]
-pub fn separated_by<
-    S,
-    A: Clone,
-    B: Clone,
-    PA: PrinterParserOps<S, A>,
-    PB: PrinterParserOps<S, B>,
-    PU: PrinterParserOps<S, ()>,
->(
-    a: PA,
-    sep: PU,
-    b: PB,
-) -> impl PrinterParserOps<S, (A, B)> {
-    a.zip_with(sep).zip_with(b).map(
-        |((a, _), b)| (a, b),
-        |(a, b)| (((*a).clone(), ()), (*b).clone()),
-    )
-}
-
-pub fn surrounded_by<
-    S,
-    A: Clone,
-    B,
-    C,
-    PA: PrinterParserOps<S, A>,
-    P1: PrinterParserOps<S, B> + DefaultValue<S, B> + 'static,
-    P2: PrinterParserOps<S, C> + DefaultValue<S, C> + 'static,
->(
-    before: P1,
-    parser: PA,
-    after: P2,
-) -> MapResult<S, (A, C), A, ZipWith<S, A, C, MapResult<S, (B, A), A, ZipWith<S, B, A, P1, PA>>, P2>>
-{
-    followed_by(preceded_by(before, parser), after)
-}
-
-pub fn separated_list<
-    S,
-    A: Clone,
-    B,
-    PA: PrinterParserOps<S, A>,
-    PB: PrinterParserOps<S, B> + DefaultValue<S, B> + 'static,
->(
-    parser: PA,
-    sep: PB,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
-    let successors = preceded_by(sep, parser.clone()).repeat();
-    parser.zip_with(successors).map_result(
-        |(v, mut vs), _| {
-            vs.push_front(v);
-            Ok(vs)
-        },
-        |a, _| {
-            a.front()
-                .ok_or("At least one element required".to_owned())
-                .map(|front| (front.clone(), a.clone().split_off(1)))
-        },
-    )
 }
 
 pub trait DefaultValue<S, A> {
@@ -1037,6 +702,7 @@ impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> fo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::printer_parser::primitives::digit;
 
     #[test]
     fn test_digit_expected() {
@@ -1075,22 +741,6 @@ mod tests {
     }
 
     #[test]
-    fn test_preceded_by() {
-        let grammar = preceded_by(char('*'), string("hello"));
-        let (rest, result) = grammar.parse("*hello", &mut ()).unwrap();
-        assert_eq!(rest, "");
-        assert_eq!(result, "hello"); // the '*' is discarded
-        match grammar.print("hello".to_owned(), &mut ()) {
-            Ok(res) => assert_eq!(res, "*hello"),
-            Err(e) => panic!("Expected `*hello`, found {:?}", e),
-        }
-
-        // let printed = .unwrap();
-
-        // assert_eq!(printed, "*hello")
-    }
-
-    #[test]
     fn test_repeat() {
         let grammar = string("rust").repeat();
 
@@ -1110,26 +760,6 @@ mod tests {
         list_for_print.extend(values);
 
         assert_eq!(grammar.print(list_for_print, &mut ()).unwrap(), "rustrust")
-    }
-
-    #[test]
-    fn test_repeat1() {
-        let grammar = repeat1(string("rust"));
-        let values = vec!["rust".to_owned(), "rust".to_owned()];
-        let mut list_for_parse = LinkedList::new();
-
-        list_for_parse.extend(values);
-
-        match grammar.parse("rustrust", &mut ()) {
-            Ok(("", result)) => assert_eq!(result, list_for_parse),
-            _ => panic!("Unexpected value"),
-        }
-
-        let values = vec![()];
-        let mut list_for_parse2 = LinkedList::new();
-        list_for_parse2.extend(values);
-
-        assert!(matches!(grammar.parse("", &mut ()), Err(_)))
     }
 
     #[test]
@@ -1184,86 +814,5 @@ mod tests {
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
         assert_eq!(grammar.print(parsed_rust, &mut ()).unwrap(), "rust");
         assert_eq!(grammar.print(parsed_haskell, &mut ()).unwrap(), "haskell");
-    }
-
-    #[test]
-    fn test_take_while() {
-        let grammar = take_while(ANY_CHAR, |a| a.is_digit(10));
-        let values = vec!['1', '2', '3'];
-        let mut list_for_parse = LinkedList::new();
-
-        list_for_parse.extend(values);
-
-        match grammar.parse("123aaaa", &mut ()) {
-            Ok(("aaaa", result)) => assert_eq!(result, list_for_parse),
-            v => panic!("Unexpected value {:?}", v),
-        }
-
-        match grammar.parse("aaaa", &mut ()) {
-            Ok(("aaaa", result)) => assert_eq!(result, LinkedList::new()),
-            v => panic!("Unexpected value {:?}", v),
-        }
-    }
-
-    #[test]
-    fn test_take_till() {
-        let grammar = take_till(ANY_CHAR, |a| a.is_ascii_punctuation());
-        let (rest, result) = grammar.parse("shut! up", &mut ()).unwrap();
-        let mut list = LinkedList::new();
-        list.extend(vec!['s', 'h', 'u', 't']);
-        assert_eq!(rest, "! up");
-        assert_eq!(result, list);
-
-        let printed = grammar.print(list, &mut ()).unwrap();
-        assert_eq!(printed, "shut")
-    }
-
-    #[test]
-    fn test_i32() {
-        let bytes: [u8; 4] = [1, 2, 3, 4]; // 1 + 2*2^8 + 3*2^16 + 4*2^24 4 + 3*2^8 + 2*2^16 + 2^24
-
-        let (_, i_le) = i32().read(&bytes, &mut Endianness::LittleEndian).unwrap();
-        let (_, i_be) = i32().read(&bytes, &mut Endianness::BigEndindan).unwrap();
-        let bytes_le = i32().write(i_le, &mut Endianness::LittleEndian).unwrap();
-        let bytes_be = i32().write(i_be, &mut Endianness::BigEndindan).unwrap();
-
-        assert_eq!(i_le, 67_305_985);
-        assert_eq!(i_be, 16_909_060);
-        assert_eq!(bytes_le, bytes);
-        assert_eq!(bytes_be, bytes);
-    }
-
-    #[test]
-    fn test_state() {
-        let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
-        let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
-
-        let endianness = bytes(1).as_state(
-            |bs, s: &mut Endianness| match bs.first().unwrap() {
-                0 => {
-                    *s = Endianness::LittleEndian;
-                    Ok(())
-                }
-                1 => {
-                    *s = Endianness::BigEndindan;
-                    Ok(())
-                }
-                _ => Err("Unreadable endianness".to_owned()),
-            },
-            |s: &Endianness| match s {
-                Endianness::LittleEndian => Ok([0].to_vec()),
-                Endianness::BigEndindan => Ok([1].to_vec()),
-            },
-        );
-
-        let grammar = preceded_by(endianness, i32());
-
-        let mut parsed_state = Endianness::LittleEndian;
-        let (_, i) = grammar.read(&be_bytes, &mut parsed_state).unwrap();
-        let result_bytes = grammar.write(i, &mut Endianness::LittleEndian).unwrap();
-
-        assert_eq!(parsed_state, Endianness::BigEndindan);
-        assert_eq!(i, 67_305_985);
-        assert_eq!(result_bytes, le_bytes);
     }
 }

@@ -1,9 +1,10 @@
-mod printerparser;
+mod printer_parser;
 
 use std::collections::LinkedList;
 
-use crate::printerparser::PrinterParser;
-use printerparser::*;
+use crate::printer_parser::combinator::*;
+use crate::printer_parser::primitives::*;
+use crate::printer_parser::printerparser::*;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq)]
@@ -16,7 +17,7 @@ enum JSON {
 }
 
 fn whitespace() -> impl PrinterParserOps<(), String> + DefaultValue<(), String> {
-    ANY_CHAR
+    consume_char
         .filter(|&c| c == ' ' || c == '\t' || c == '\n')
         .repeat()
         .as_string()
@@ -48,7 +49,7 @@ fn parse_number() -> impl PrinterParserOps<(), JSON> {
 fn parse_string_literal() -> impl PrinterParserOps<(), String> {
     surrounded_by(
         char('"'),
-        ANY_CHAR.filter(|c| *c != '"').repeat(),
+        consume_char.filter(|c| *c != '"').repeat(),
         char('"'),
     )
     .as_string()
