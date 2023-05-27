@@ -327,10 +327,10 @@ pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
 ) -> impl PrinterParserOps<S, LinkedList<A>> {
     let c2 = combinator.clone();
 
-    combinator.zip_with(c2.repeat().clone()).map_result(
+    combinator.zip_with(c2.repeat()).map_result(
         |(a, mut aa), _| {
             aa.push_front(a);
-            return Ok(aa);
+            Ok(aa)
         },
         |a, _| {
             a.front()
@@ -438,7 +438,7 @@ where
                 }
             },
             move |a, _| {
-                if predicate(&a) {
+                if predicate(a) {
                     Ok(a.clone())
                 } else {
                     Err("Predicate failed".to_owned())
@@ -505,7 +505,7 @@ where
     {
         Count {
             times: times,
-            parser: self.clone(),
+            parser: self,
             phantom: PhantomData,
         }
     }
@@ -897,7 +897,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
-        if i.len() < self.0.into() {
+        if i.len() < self.0 {
             Err("input has not enough elements left".to_owned())
         } else {
             Ok((
@@ -916,7 +916,7 @@ impl<S> PrinterParser<S, char> for ConsumeChar {
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], char), String> {
-        if i.len() == 0 {
+        if i.is_empty() {
             return Err("0 length input encountered".to_owned());
         }
 
@@ -925,7 +925,7 @@ impl<S> PrinterParser<S, char> for ConsumeChar {
             .or_else(|_| std::str::from_utf8(&i[..3]))
             .or_else(|_| std::str::from_utf8(&i[..4]))
             .map_err(|e| format!("{}", e))
-            .map(|s| (&i[s.as_bytes().len()..], s.chars().nth(0).unwrap()))
+            .map(|s| (&i[s.as_bytes().len()..], s.chars().next().unwrap()))
     }
 }
 

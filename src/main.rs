@@ -5,6 +5,7 @@ use std::collections::LinkedList;
 use crate::printerparser::PrinterParser;
 use printerparser::*;
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq)]
 enum JSON {
     Boolean(bool),
@@ -35,7 +36,7 @@ fn parse_number() -> impl PrinterParserOps<(), JSON> {
             value
                 .parse::<i64>()
                 .map_err(|_| "Could not parse".to_owned())
-                .map(|v| JSON::Number(v))
+                .map(JSON::Number)
         },
         |value, _| match value {
             JSON::Number(v) => Ok(v.to_string()),
