@@ -93,13 +93,16 @@ fn parse_object() -> impl PrinterParserOps<(), JSON> {
         Box::new(
             surrounded_by(
                 token(char('{')),
-                parse_string_literal()
-                    .zip_with(surrounded_by(
-                        token(char(':')),
-                        parse_json(),
-                        token(char(',')),
-                    ))
-                    .repeat(),
+                separated_list(
+                    parse_string_literal()
+                        .zip_with(token(char(':')))
+                        .zip_with(parse_json())
+                        .map(
+                            |((key, _), json)| (key, json),
+                            |(key, json)| ((key.to_owned(), ':'), json.to_owned()),
+                        ),
+                    token(char(',')),
+                ),
                 token(char('}')),
             )
             .map_result(
@@ -125,15 +128,13 @@ fn main() {
     // TODO: maybe
     let object_literal = "{ \
         \"this\": \"is valid JSON\", \
-        \"almost\":  false, \
-        \"year\": [2,0,2,3], \
+        \"almost\":  true, \
+        \"year\": [2,0,2,3] \
     }";
 
     let (_, object_t) = parse_json().parse(object_literal, &mut ()).unwrap();
 
     println!("{:?}", object_t);
-
-    // TODO: fix printing
 
     let printed = parse_json().print(object_t, &mut ()).unwrap();
     println!("{:?}", printed)
