@@ -300,7 +300,7 @@ pub fn preceded_by<
     parser: PA,
 ) -> MapResult<S, (B, A), A, ZipWith<S, B, A, PB, PA>> {
     before.clone().zip_with(parser).map_result(
-        |(_, a), _| Ok(a),
+        |(_, a), _state| Ok(a),
         move |a, s| before.value(s).map(|b| (b, (*a).clone())),
     )
 }
@@ -1047,30 +1047,21 @@ mod tests {
 
     #[test]
     fn test_string() {
-        let expected = "hello".to_owned();
-        assert!(matches!(
-            string("hello").parse("hello there", &mut ()),
-            Ok((" there", expected))
-        ));
+        let grammar = string("hello");
+        let (rest, result) = grammar.parse("hello there", &mut ()).unwrap();
+        assert_eq!(rest, " there");
+        assert_eq!(result, "hello");
+        assert_eq!(grammar.print("hello".to_owned(), &mut ()).unwrap(), "hello");
 
-        assert_eq!(
-            string("hello").print("hello".to_owned(), &mut ()).unwrap(),
-            "hello"
-        );
-
-        assert!(matches!(
-            string("hello").parse("general kenobi", &mut ()),
-            Err(_)
-        ));
+        assert!(matches!(grammar.parse("general kenobi", &mut ()), Err(_)));
     }
 
     #[test]
     fn test_tag() {
-        let expected = b"hello".to_vec();
-        assert!(matches!(
-            tag(b"hello").read(b"hello there", &mut ()),
-            Ok((b" there", expected))
-        ));
+        let grammar = tag(b"hello");
+        let (rest, result) = grammar.read(b"hello there", &mut ()).unwrap();
+        assert_eq!(rest, b" there");
+        assert_eq!(result, b"hello");
 
         assert_eq!(
             tag(b"hello").write(b"hello".to_vec(), &mut ()).unwrap(),
@@ -1086,14 +1077,17 @@ mod tests {
     #[test]
     fn test_preceded_by() {
         let grammar = preceded_by(char('*'), string("hello"));
-        let expected = "hello".to_owned();
-        assert_eq!(grammar.parse("*hello", &mut ()), Ok(("", expected)));
-        assert_eq!(
-            string("*hello")
-                .print("*hello".to_owned(), &mut ())
-                .unwrap(),
-            "*hello"
-        )
+        let (rest, result) = grammar.parse("*hello", &mut ()).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result, "hello"); // the '*' is discarded
+        match grammar.print("hello".to_owned(), &mut ()) {
+            Ok(res) => assert_eq!(res, "*hello"),
+            Err(e) => panic!("Expected `*hello`, found {:?}", e),
+        }
+
+        // let printed = .unwrap();
+
+        // assert_eq!(printed, "*hello")
     }
 
     #[test]
@@ -1179,15 +1173,14 @@ mod tests {
 
         let parsed_rust = "rust".to_owned();
         let parsed_haskell = "haskell".to_owned();
+        let (rest, result) = grammar.parse("rust", &mut ()).unwrap();
+        assert_eq!(result, "rust");
+        assert_eq!(rest, "");
 
-        assert!(matches!(
-            grammar.parse("rust", &mut ()),
-            Ok(("", parsed_rust))
-        ));
-        assert!(matches!(
-            grammar.parse("haskell", &mut ()),
-            Ok(("", parsed_haskell))
-        ));
+        let (rest, result) = grammar.parse("haskell", &mut ()).unwrap();
+        assert_eq!(result, "haskell");
+        assert_eq!(rest, "");
+
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
         assert_eq!(grammar.print(parsed_rust, &mut ()).unwrap(), "rust");
         assert_eq!(grammar.print(parsed_haskell, &mut ()).unwrap(), "haskell");
