@@ -349,18 +349,6 @@ pub struct Alt<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> {
     phantom: PhantomData<(A, S)>,
 }
 
-impl<S, A, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clone> Clone
-    for Alt<S, A, PA, PB>
-{
-    fn clone(&self) -> Self {
-        Alt {
-            a: self.a.clone(),
-            b: self.b.clone(),
-            phantom: PhantomData,
-        }
-    }
-}
-
 pub struct MapResult<S, A, B, P: PrinterParser<S, A> + Sized> {
     parser: P,
     f: Rc<dyn Fn(A, &S) -> Result<B, String>>,
@@ -381,18 +369,6 @@ pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     a: PA,
     b: PB,
     phantom: PhantomData<(A, B, S)>,
-}
-
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone> Clone
-    for ZipWith<S, A, B, PA, PB>
-{
-    fn clone(&self) -> Self {
-        ZipWith {
-            a: self.a.clone(),
-            b: self.b.clone(),
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<
