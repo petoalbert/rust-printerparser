@@ -32,7 +32,7 @@ struct MapState<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> {
 impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> PrinterParser<S, A>
     for Rc<MapState<S, A, F>>
 {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
         (self.f)(s).write(i, s)
     }
 
@@ -229,11 +229,11 @@ where
 // PrinterParser trait
 
 pub trait PrinterParser<S, A> {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String>;
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String>;
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String>;
 
-    fn print(&self, i: A, s: &mut S) -> Result<String, String> {
+    fn print(&self, i: &A, s: &mut S) -> Result<String, String> {
         self.write(i, s).and_then(|bytes| {
             std::str::from_utf8(&bytes)
                 .map(|s| s.to_owned())
@@ -279,9 +279,9 @@ impl<
         P: PrinterParser<S, A>,
     > PrinterParser<S, ()> for Rc<State<S, A, F, G, P>>
 {
-    fn write(&self, i: (), s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &(), s: &mut S) -> Result<Vec<u8>, String> {
         let a = (self.write_state)(s)?;
-        self.parser.write(a, s)
+        self.parser.write(&a, s)
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], ()), String> {
@@ -334,7 +334,7 @@ impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, 
 impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParser<S, A>
     for Rc<Defer<S, A, F>>
 {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
         (self.resolve)().write(i, s)
     }
 
@@ -424,7 +424,7 @@ pub struct Count<S, A, P: PrinterParser<S, A>> {
 // Parser implementations
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, A> for Rc<Default<S, A, P>> {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
         self.parser.write(i, s)
     }
 
@@ -444,8 +444,8 @@ impl<S, A: Clone, P: PrinterParser<S, A>> DefaultValue<S, A> for Rc<Default<S, A
 impl<S, A: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParser<S, A>
     for Rc<Alt<S, A, PA, PB>>
 {
-    fn write(&self, i: A, s: &mut S) -> Result<Vec<u8>, String> {
-        self.a.write(i.clone(), s).or(self.b.write(i, s))
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
+        self.a.write(i, s).or(self.b.write(i, s))
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
@@ -459,7 +459,7 @@ impl<S, A: Clone, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clo
 }
 
 impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
-    fn write(&self, v: Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, v: &Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
         if v == self.0 {
             Ok(self.0.to_vec())
         } else {
@@ -486,8 +486,8 @@ impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
 impl<'a, S> PrinterParserOps<S, Vec<u8>> for ExpectString<'a> {}
 
 impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
-    fn write(&self, i: Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
-        Ok(i)
+    fn write(&self, i: &Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+        Ok(i.clone())
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
@@ -505,7 +505,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
 impl<S> PrinterParserOps<S, Vec<u8>> for ConsumeBytes {}
 
 impl<S> PrinterParser<S, char> for ConsumeChar {
-    fn write(&self, i: char, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &char, s: &mut S) -> Result<Vec<u8>, String> {
         Ok(i.to_string().bytes().collect())
     }
 
@@ -526,9 +526,9 @@ impl<S> PrinterParser<S, char> for ConsumeChar {
 impl<S> PrinterParserOps<S, char> for ConsumeChar {}
 
 impl<S, A, B, P: PrinterParser<S, A>> PrinterParser<S, B> for Rc<MapResult<S, A, B, P>> {
-    fn write(&self, i: B, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &B, s: &mut S) -> Result<Vec<u8>, String> {
         let o = (self.g)(&i, s)?;
-        self.parser.write(o, s)
+        self.parser.write(&o, s)
     }
 
     fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], B), String> {
@@ -552,7 +552,7 @@ impl<S, A, B, P: PrinterParser<S, A> + Clone + DefaultValue<S, A>> DefaultValue<
 impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S, (A, B)>
     for Rc<ZipWith<S, A, B, PA, PB>>
 {
-    fn write(&self, i: (A, B), s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &(A, B), s: &mut S) -> Result<Vec<u8>, String> {
         let (a, b) = i;
         let mut x = (self.a).write(a, s)?;
         let mut y = (self.b).write(b, s)?;
@@ -573,7 +573,7 @@ impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone>
 }
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S, A, P>> {
-    fn write(&self, x: LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, x: &LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
         x.into_iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
@@ -600,7 +600,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S,
 impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> for Rc<Rep<S, A, P>> {}
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Count<S, A, P>> {
-    fn write(&self, x: LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, x: &LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
         x.into_iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
@@ -640,7 +640,7 @@ mod tests {
     fn test_digit_expected() {
         assert!(matches!(digit().parse("2", &mut ()), Ok(("", '2'))));
         assert!(matches!(digit().parse("a", &mut ()), Err(_)));
-        assert_eq!(digit().print('2', &mut ()).unwrap(), "2")
+        assert_eq!(digit().print(&'2', &mut ()).unwrap(), "2")
     }
 
     #[test]
@@ -649,7 +649,7 @@ mod tests {
         let (rest, result) = grammar.parse("hello there", &mut ()).unwrap();
         assert_eq!(rest, " there");
         assert_eq!(result, "hello");
-        assert_eq!(grammar.print("hello".to_owned(), &mut ()).unwrap(), "hello");
+        assert_eq!(grammar.print(&"hello".to_owned(), &mut ()).unwrap(), "hello");
 
         assert!(matches!(grammar.parse("general kenobi", &mut ()), Err(_)));
     }
@@ -662,7 +662,7 @@ mod tests {
         assert_eq!(result, b"hello");
 
         assert_eq!(
-            tag(b"hello").write(b"hello".to_vec(), &mut ()).unwrap(),
+            tag(b"hello").write(&b"hello".to_vec(), &mut ()).unwrap(),
             b"hello"
         );
 
@@ -691,7 +691,7 @@ mod tests {
 
         list_for_print.extend(values);
 
-        assert_eq!(grammar.print(list_for_print, &mut ()).unwrap(), "rustrust")
+        assert_eq!(grammar.print(&list_for_print, &mut ()).unwrap(), "rustrust")
     }
 
     #[test]
@@ -705,7 +705,7 @@ mod tests {
         list.extend(vec!['1', '2', '3']);
         assert_eq!(result, list);
 
-        let printed = grammar.print(list, &mut ()).unwrap();
+        let printed = grammar.print(&list, &mut ()).unwrap();
         assert_eq!(printed, "123")
     }
 
@@ -744,7 +744,7 @@ mod tests {
         assert_eq!(rest, "");
 
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
-        assert_eq!(grammar.print(parsed_rust, &mut ()).unwrap(), "rust");
-        assert_eq!(grammar.print(parsed_haskell, &mut ()).unwrap(), "haskell");
+        assert_eq!(grammar.print(&parsed_rust, &mut ()).unwrap(), "rust");
+        assert_eq!(grammar.print(&parsed_haskell, &mut ()).unwrap(), "haskell");
     }
 }

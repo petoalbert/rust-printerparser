@@ -138,6 +138,6 @@ fn main() {
 
     println!("{:?}", object_t);
 
-    let printed = parse_json().print(object_t, &mut ()).unwrap();
+    let printed = parse_json().print(&object_t, &mut ()).unwrap();
     println!("{:?}", printed)
 }

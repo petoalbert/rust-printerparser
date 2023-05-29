@@ -145,7 +145,7 @@ mod tests {
         let (rest, result) = grammar.parse("*hello", &mut ()).unwrap();
         assert_eq!(rest, "");
         assert_eq!(result, "hello"); // the '*' is discarded
-        match grammar.print("hello".to_owned(), &mut ()) {
+        match grammar.print(&"hello".to_owned(), &mut ()) {
             Ok(res) => assert_eq!(res, "*hello"),
             Err(e) => panic!("Expected `*hello`, found {:?}", e),
         }
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(rest, "! up");
         assert_eq!(result, list);
 
-        let printed = grammar.print(list, &mut ()).unwrap();
+        let printed = grammar.print(&list, &mut ()).unwrap();
         assert_eq!(printed, "shut")
     }
 }

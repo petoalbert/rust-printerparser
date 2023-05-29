@@ -211,8 +211,8 @@ mod tests {
 
         let (_, i_le) = i32().read(&bytes, &mut Endianness::LittleEndian).unwrap();
         let (_, i_be) = i32().read(&bytes, &mut Endianness::BigEndindan).unwrap();
-        let bytes_le = i32().write(i_le, &mut Endianness::LittleEndian).unwrap();
-        let bytes_be = i32().write(i_be, &mut Endianness::BigEndindan).unwrap();
+        let bytes_le = i32().write(&i_le, &mut Endianness::LittleEndian).unwrap();
+        let bytes_be = i32().write(&i_be, &mut Endianness::BigEndindan).unwrap();
 
         assert_eq!(i_le, 67_305_985);
         assert_eq!(i_be, 16_909_060);
