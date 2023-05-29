@@ -41,7 +41,7 @@ impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> PrinterParser<S, A>
     }
 }
 
-impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, A>
+impl<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>>> PrinterParserOps<S, A>
     for Rc<MapState<S, A, F>>
 {
 }
@@ -294,9 +294,9 @@ impl<
 impl<
         S,
         A,
-        F: Fn(A, &mut S) -> Result<(), String> + Clone,
-        G: Fn(&S) -> Result<A, String> + Clone,
-        P: PrinterParser<S, A> + Clone,
+        F: Fn(A, &mut S) -> Result<(), String>,
+        G: Fn(&S) -> Result<A, String>,
+        P: PrinterParser<S, A>,
     > PrinterParserOps<S, ()> for Rc<State<S, A, F, G, P>>
 {
 }
@@ -304,9 +304,9 @@ impl<
 impl<
         S,
         A,
-        F: Fn(A, &mut S) -> Result<(), String> + Clone,
-        G: Fn(&S) -> Result<A, String> + Clone,
-        P: PrinterParser<S, A> + Clone,
+        F: Fn(A, &mut S) -> Result<(), String>,
+        G: Fn(&S) -> Result<A, String>,
+        P: PrinterParser<S, A>,
     > DefaultValue<S, ()> for Rc<State<S, A, F, G, P>>
 {
     fn value(&self, s: &S) -> Result<(), String> {
@@ -326,14 +326,9 @@ pub fn defer<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>>(f: F) -> Rc<Defer<S,
     })
 }
 
-impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParserOps<S, A>
-    for Rc<Defer<S, A, F>>
-{
-}
+impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>> PrinterParserOps<S, A> for Rc<Defer<S, A, F>> {}
 
-impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>> + Clone> PrinterParser<S, A>
-    for Rc<Defer<S, A, F>>
-{
+impl<S, A, F: Fn() -> Box<dyn PrinterParser<S, A>>> PrinterParser<S, A> for Rc<Defer<S, A, F>> {
     fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
         (self.resolve)().write(i, s)
     }
@@ -375,8 +370,8 @@ impl<
         S,
         A,
         B,
-        PA: PrinterParser<S, A> + Clone + DefaultValue<S, A>,
-        PB: PrinterParser<S, B> + Clone + DefaultValue<S, B>,
+        PA: PrinterParser<S, A> + DefaultValue<S, A>,
+        PB: PrinterParser<S, B> + DefaultValue<S, B>,
     > DefaultValue<S, (A, B)> for Rc<ZipWith<S, A, B, PA, PB>>
 {
     fn value(&self, s: &S) -> Result<(A, B), String> {
@@ -409,7 +404,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, A> for Rc<Default<S, A, P>> 
     }
 }
 
-impl<S, A: Clone, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, A> for Rc<Default<S, A, P>> {}
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, A> for Rc<Default<S, A, P>> {}
 
 impl<S, A: Clone, P: PrinterParser<S, A>> DefaultValue<S, A> for Rc<Default<S, A, P>> {
     fn value(&self, _: &S) -> Result<A, String> {
@@ -417,7 +412,7 @@ impl<S, A: Clone, P: PrinterParser<S, A>> DefaultValue<S, A> for Rc<Default<S, A
     }
 }
 
-impl<S, A: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParser<S, A>
+impl<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParser<S, A>
     for Rc<Alt<S, A, PA, PB>>
 {
     fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
@@ -429,8 +424,8 @@ impl<S, A: Clone, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParse
     }
 }
 
-impl<S, A: Clone, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, A> + Clone>
-    PrinterParserOps<S, A> for Rc<Alt<S, A, PA, PB>>
+impl<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParserOps<S, A>
+    for Rc<Alt<S, A, PA, PB>>
 {
 }
 
@@ -514,9 +509,9 @@ impl<S, A, B, P: PrinterParser<S, A>> PrinterParser<S, B> for Rc<MapResult<S, A,
     }
 }
 
-impl<S, A, B, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, B> for Rc<MapResult<S, A, B, P>> {}
+impl<S, A, B, P: PrinterParser<S, A>> PrinterParserOps<S, B> for Rc<MapResult<S, A, B, P>> {}
 
-impl<S, A, B, P: PrinterParser<S, A> + Clone + DefaultValue<S, A>> DefaultValue<S, B>
+impl<S, A, B, P: PrinterParser<S, A> + DefaultValue<S, A>> DefaultValue<S, B>
     for Rc<MapResult<S, A, B, P>>
 {
     fn value(&self, s: &S) -> Result<B, String> {
@@ -543,8 +538,8 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
-impl<S, A, B, PA: PrinterParser<S, A> + Clone, PB: PrinterParser<S, B> + Clone>
-    PrinterParserOps<S, (A, B)> for Rc<ZipWith<S, A, B, PA, PB>>
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (A, B)>
+    for Rc<ZipWith<S, A, B, PA, PB>>
 {
 }
 
@@ -573,7 +568,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S,
     }
 }
 
-impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>> for Rc<Rep<S, A, P>> {}
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rc<Rep<S, A, P>> {}
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Count<S, A, P>> {
     fn write(&self, x: &LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
@@ -602,10 +597,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Count<
     }
 }
 
-impl<S, A, P: PrinterParser<S, A> + Clone> PrinterParserOps<S, LinkedList<A>>
-    for Rc<Count<S, A, P>>
-{
-}
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rc<Count<S, A, P>> {}
 
 #[cfg(test)]
 mod tests {
@@ -625,7 +617,10 @@ mod tests {
         let (rest, result) = grammar.parse("hello there", &mut ()).unwrap();
         assert_eq!(rest, " there");
         assert_eq!(result, "hello");
-        assert_eq!(grammar.print(&"hello".to_owned(), &mut ()).unwrap(), "hello");
+        assert_eq!(
+            grammar.print(&"hello".to_owned(), &mut ()).unwrap(),
+            "hello"
+        );
 
         assert!(matches!(grammar.parse("general kenobi", &mut ()), Err(_)));
     }
