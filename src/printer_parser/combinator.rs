@@ -1,5 +1,5 @@
 use crate::printer_parser::printerparser::{DefaultValue, MapResult, PrinterParserOps, ZipWith};
-use std::collections::LinkedList;
+use std::{collections::LinkedList, rc::Rc};
 
 pub fn preceded_by<
     S,
@@ -10,7 +10,7 @@ pub fn preceded_by<
 >(
     before: PB,
     parser: PA,
-) -> MapResult<S, (B, A), A, ZipWith<S, B, A, PB, PA>> {
+) -> Rc<MapResult<S, (B, A), A, Rc<ZipWith<S, B, A, PB, PA>>>> {
     before.clone().zip_with(parser).map_result(
         |(_, a), _state| Ok(a),
         move |a, s| before.value(s).map(|b| (b, (*a).clone())),
@@ -26,7 +26,7 @@ pub fn followed_by<
 >(
     parser: PA,
     after: PB,
-) -> MapResult<S, (A, B), A, ZipWith<S, A, B, PA, PB>> {
+) -> Rc<MapResult<S, (A, B), A, Rc<ZipWith<S, A, B, PA, PB>>>> {
     parser.zip_with(after.clone()).map_result(
         |(a, _), _| Ok(a),
         move |a, s| after.value(s).map(|b| ((*a).clone(), b)),
@@ -98,8 +98,14 @@ pub fn surrounded_by<
     before: P1,
     parser: PA,
     after: P2,
-) -> MapResult<S, (A, C), A, ZipWith<S, A, C, MapResult<S, (B, A), A, ZipWith<S, B, A, P1, PA>>, P2>>
-{
+) -> Rc<
+    MapResult<
+        S,
+        (A, C),
+        A,
+        Rc<ZipWith<S, A, C, Rc<MapResult<S, (B, A), A, Rc<ZipWith<S, B, A, P1, PA>>>>, P2>>,
+    >,
+> {
     followed_by(preceded_by(before, parser), after)
 }
 
