@@ -133,6 +133,47 @@ pub fn separated_list<
     )
 }
 
+pub fn tuple3<
+    S,
+    A: Clone,
+    B: Clone,
+    C: Clone,
+    PA: PrinterParserOps<S, A>,
+    PB: PrinterParserOps<S, B>,
+    PC: PrinterParserOps<S, C>,
+>(
+    first: PA,
+    second: PB,
+    third: PC,
+) -> impl PrinterParserOps<S, (A, B, C)> {
+    first.zip_with(second).zip_with(third).map(
+        |((f, s), t)| (f, s, t),
+        |(f, s, t)| (((*f).clone(), (*s).clone()), (*t).clone()),
+    )
+}
+
+pub fn tuple4<
+    S,
+    A: Clone,
+    B: Clone,
+    C: Clone,
+    D: Clone,
+    PA: PrinterParserOps<S, A>,
+    PB: PrinterParserOps<S, B>,
+    PC: PrinterParserOps<S, C>,
+    PD: PrinterParserOps<S, D>,
+>(
+    first: PA,
+    second: PB,
+    third: PC,
+    fourth: PD,
+) -> impl PrinterParserOps<S, (A, B, C, D)> {
+    tuple3(first, second, third).zip_with(fourth).map(
+        |((f, s, t), fo)| (f, s, t, fo),
+        |(f, s, t, fo)| (((*f).clone(), (*s).clone(), (*t).clone()), (*fo).clone()),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +242,33 @@ mod tests {
 
         let printed = grammar.print(&list, &mut ()).unwrap();
         assert_eq!(printed, "shut")
+    }
+
+    #[test]
+    fn test_tuple_3() {
+        let grammar = tuple3(char('a'), char('b'), char('c'));
+        let (rest, result) = grammar.parse("abc", &mut ()).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result, ('a', 'b', 'c'));
+
+        let result_bad = grammar.parse("abd", &mut ());
+        assert!(matches!(result_bad, Err(_)));
+
+        let printed = grammar.print(&result, &mut ()).unwrap();
+        assert_eq!(printed, "abc")
+    }
+
+    #[test]
+    fn test_tuple_4() {
+        let grammar = tuple4(char('w'), char('x'), char('y'), char('z'));
+        let (rest, result) = grammar.parse("wxyz", &mut ()).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result, ('w', 'x', 'y', 'z'));
+
+        let result_bad = grammar.parse("abd", &mut ());
+        assert!(matches!(result_bad, Err(_)));
+
+        let printed = grammar.print(&result, &mut ()).unwrap();
+        assert_eq!(printed, "wxyz")
     }
 }
