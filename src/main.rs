@@ -1,10 +1,13 @@
 mod printer_parser;
+mod blend;
 
 use std::collections::LinkedList;
 
 use crate::printer_parser::combinator::*;
 use crate::printer_parser::primitives::*;
 use crate::printer_parser::printerparser::*;
+
+use crate::blend::*;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq)]
