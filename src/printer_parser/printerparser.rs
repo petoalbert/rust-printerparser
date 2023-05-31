@@ -148,6 +148,17 @@ where
         })
     }
 
+    fn many_till<B, P: PrinterParser<S, B>>(self, other: P) -> Rc<ManyTill<S, A, B, Self, P>>
+    where
+        Self: Sized,
+    {
+        Rc::new(ManyTill {
+            parser: self,
+            end: other,
+            phantom: PhantomData,
+        })
+    }
+
     fn repeat(self) -> Rc<Rep<S, A, Self>>
     where
         Self: Sized,
@@ -366,6 +377,12 @@ pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
+pub struct ManyTill<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
+    parser: PA,
+    end: PB,
+    phantom: PhantomData<(A, B, S)>,
+}
+
 impl<
         S,
         A,
@@ -538,8 +555,49 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S, (LinkedList<A>, B)>
+    for Rc<ManyTill<S, A, B, PA, PB>>
+{
+    fn write(&self, i: &(LinkedList<A>, B), s: &mut S) -> Result<Vec<u8>, String> {
+        let (a, b) = i;
+        let mut x = a
+            .into_iter()
+            .map(|item| (self.parser).write(item, s))
+            .collect::<Result<Vec<Vec<u8>>, String>>()
+            .map(|vs| vs.concat())?; // TODO bad performance
+        let mut y = (self.end).write(b, s)?;
+        x.append(&mut y); // TODO Vec is not good for performance here
+        Ok(x)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], (LinkedList<A>, B)), String> {
+        let mut elements = LinkedList::new();
+        let mut rem = i;
+        loop {
+            let maybe_end = (self.end).read(rem, s);
+            if let Ok((rem1, end)) = maybe_end {
+                return Ok((rem1, (elements, end)));
+            }
+
+            let next = self.parser.read(rem, s);
+            match next {
+                Err(_) => return Err("parser failed".to_owned()),
+                Ok((rem1, a)) => {
+                    elements.push_back(a);
+                    rem = rem1
+                }
+            }
+        }
+    }
+}
+
 impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (A, B)>
     for Rc<ZipWith<S, A, B, PA, PB>>
+{
+}
+
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>>
+    PrinterParserOps<S, (LinkedList<A>, B)> for Rc<ManyTill<S, A, B, PA, PB>>
 {
 }
 
@@ -560,11 +618,11 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S,
                 Err(_) => break,
                 Ok((rem1, a)) => {
                     rem = rem1;
-                    elements.push_front(a);
+                    elements.push_back(a);
                 }
             }
         }
-        Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
+        Ok((rem, elements))
     }
 }
 
@@ -717,5 +775,34 @@ mod tests {
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
         assert_eq!(grammar.print(&parsed_rust, &mut ()).unwrap(), "rust");
         assert_eq!(grammar.print(&parsed_haskell, &mut ()).unwrap(), "haskell");
+    }
+
+    #[test]
+    fn test_many_till() {
+        let grammar = string("abc").many_till(string("end"));
+        let (rest, result) = grammar.parse("abcabcabcend", &mut ()).unwrap();
+
+        let mut list: LinkedList<String> = LinkedList::new();
+        list.extend(vec!["abc".to_owned(), "abc".to_owned(), "abc".to_owned()]);
+
+        assert_eq!(rest, "");
+        assert_eq!(result.0, list);
+        assert_eq!(result.1, "end");
+
+        let printed = grammar.print(&(list, "end".to_owned()), &mut ()).unwrap();
+        assert_eq!(printed, "abcabcabcend");
+    }
+
+    #[test]
+    fn test_many_till_incomplete() {
+        let grammar = string("abc").many_till(string("end"));
+        let (rest, result) = grammar.parse("abcendwawawa", &mut ()).unwrap();
+
+        let mut list: LinkedList<String> = LinkedList::new();
+        list.extend(vec!["abc".to_owned()]);
+
+        assert_eq!(rest, "wawawa");
+        assert_eq!(result.0, list);
+        assert_eq!(result.1, "end");
     }
 }
