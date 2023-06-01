@@ -779,27 +779,27 @@ mod tests {
 
     #[test]
     fn test_many_till() {
-        let grammar = string("abc").many_till(string("end"));
-        let (rest, result) = grammar.parse("abcabcabcend", &mut ()).unwrap();
+        let grammar = digit().many_till(string("end"));
+        let (rest, result) = grammar.parse("46387end", &mut ()).unwrap();
 
-        let mut list: LinkedList<String> = LinkedList::new();
-        list.extend(vec!["abc".to_owned(), "abc".to_owned(), "abc".to_owned()]);
+        let mut list: LinkedList<char> = LinkedList::new();
+        list.extend(vec!['4', '6', '3', '8', '7']);
 
         assert_eq!(rest, "");
         assert_eq!(result.0, list);
         assert_eq!(result.1, "end");
 
         let printed = grammar.print(&(list, "end".to_owned()), &mut ()).unwrap();
-        assert_eq!(printed, "abcabcabcend");
+        assert_eq!(printed, "46387end");
     }
 
     #[test]
     fn test_many_till_incomplete() {
-        let grammar = string("abc").many_till(string("end"));
-        let (rest, result) = grammar.parse("abcendwawawa", &mut ()).unwrap();
+        let grammar = digit().many_till(string("end"));
+        let (rest, result) = grammar.parse("1342endwawawa", &mut ()).unwrap();
 
-        let mut list: LinkedList<String> = LinkedList::new();
-        list.extend(vec!["abc".to_owned()]);
+        let mut list: LinkedList<char> = LinkedList::new();
+        list.extend(vec!['1', '3', '4', '2']);
 
         assert_eq!(rest, "wawawa");
         assert_eq!(result.0, list);
