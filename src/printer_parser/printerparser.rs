@@ -19,7 +19,7 @@ pub fn map_state<S, A, F: Fn(&mut S) -> Box<dyn PrinterParser<S, A>> + Clone>(
     f: F,
 ) -> impl PrinterParserOps<S, A> {
     Rc::new(MapState {
-        f: f,
+        f,
         phantom: PhantomData,
     })
 }
@@ -50,9 +50,9 @@ pub fn bytes<S>(count: usize) -> impl PrinterParserOps<S, Vec<u8>> {
     ConsumeBytes(count)
 }
 
-pub fn string<'a, S: 'static>(
-    s: &'a str,
-) -> impl PrinterParserOps<S, String> + DefaultValue<S, String> + 'a {
+pub fn string<S: 'static>(
+    s: &str,
+) -> impl PrinterParserOps<S, String> + DefaultValue<S, String> + '_ {
     ExpectString(s.as_bytes())
         .map_result(
             |a, _| {
@@ -65,9 +65,9 @@ pub fn string<'a, S: 'static>(
         .default(s.to_owned())
 }
 
-pub fn tag<'a, S: 'static>(
-    bs: &'a [u8],
-) -> impl PrinterParserOps<S, Vec<u8>> + DefaultValue<S, Vec<u8>> + 'a {
+pub fn tag<S: 'static>(
+    bs: &[u8],
+) -> impl PrinterParserOps<S, Vec<u8>> + DefaultValue<S, Vec<u8>> + '_ {
     ExpectString(bs).default(bs.to_vec())
 }
 
@@ -174,7 +174,7 @@ where
         Self: Sized,
     {
         Rc::new(Count {
-            times: times,
+            times,
             parser: self,
             phantom: PhantomData,
         })
@@ -205,8 +205,8 @@ where
     ) -> Rc<State<S, A, F, G, Self>> {
         Rc::new(State {
             parser: self,
-            read_state: read_state,
-            write_state: write_state,
+            read_state,
+            write_state,
             phantom: PhantomData,
         })
     }
@@ -290,7 +290,7 @@ impl<
         P: PrinterParser<S, A>,
     > PrinterParser<S, ()> for Rc<State<S, A, F, G, P>>
 {
-    fn write(&self, i: &(), s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, _: &(), s: &mut S) -> Result<Vec<u8>, String> {
         let a = (self.write_state)(s)?;
         self.parser.write(&a, s)
     }
@@ -320,7 +320,7 @@ impl<
         P: PrinterParser<S, A>,
     > DefaultValue<S, ()> for Rc<State<S, A, F, G, P>>
 {
-    fn value(&self, s: &S) -> Result<(), String> {
+    fn value(&self, _: &S) -> Result<(), String> {
         Ok(())
     }
 }
@@ -455,7 +455,7 @@ impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
         }
     }
 
-    fn read<'b>(&self, i: &'b [u8], s: &mut S) -> Result<(&'b [u8], Vec<u8>), String> {
+    fn read<'b>(&self, i: &'b [u8], _: &mut S) -> Result<(&'b [u8], Vec<u8>), String> {
         if i.len() < self.0.len() {
             Err(format!("Cannot match {}, not enough input", "FIXME"))
         } else {
@@ -474,7 +474,7 @@ impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
 impl<'a, S> PrinterParserOps<S, Vec<u8>> for ExpectString<'a> {}
 
 impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
-    fn write(&self, i: &Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &Vec<u8>, _: &mut S) -> Result<Vec<u8>, String> {
         Ok(i.clone())
     }
 
@@ -482,10 +482,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
         if i.len() < self.0 {
             Err("input has not enough elements left".to_owned())
         } else {
-            Ok((
-                &i[(self.0)..],
-                i[0..(self.0)].to_owned().into_iter().collect(),
-            ))
+            Ok((&i[(self.0)..], i[0..(self.0)].to_vec()))
         }
     }
 }
@@ -493,11 +490,11 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
 impl<S> PrinterParserOps<S, Vec<u8>> for ConsumeBytes {}
 
 impl<S> PrinterParser<S, char> for ConsumeChar {
-    fn write(&self, i: &char, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, i: &char, _: &mut S) -> Result<Vec<u8>, String> {
         Ok(i.to_string().bytes().collect())
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], char), String> {
+    fn read<'a>(&self, i: &'a [u8], _: &mut S) -> Result<(&'a [u8], char), String> {
         if i.is_empty() {
             return Err("0 length input encountered".to_owned());
         }
@@ -515,7 +512,7 @@ impl<S> PrinterParserOps<S, char> for ConsumeChar {}
 
 impl<S, A, B, P: PrinterParser<S, A>> PrinterParser<S, B> for Rc<MapResult<S, A, B, P>> {
     fn write(&self, i: &B, s: &mut S) -> Result<Vec<u8>, String> {
-        let o = (self.g)(&i, s)?;
+        let o = (self.g)(i, s)?;
         self.parser.write(&o, s)
     }
 
@@ -561,7 +558,7 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     fn write(&self, i: &(Vec<A>, B), s: &mut S) -> Result<Vec<u8>, String> {
         let (a, b) = i;
         let mut x = a
-            .into_iter()
+            .iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat())?; // TODO bad performance
@@ -603,7 +600,7 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, Vec<A>> for Rc<Rep<S, A, P>> {
     fn write(&self, x: &Vec<A>, s: &mut S) -> Result<Vec<u8>, String> {
-        x.into_iter()
+        x.iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat()) // TODO bad performance
@@ -630,7 +627,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Rep<S, A, 
 
 impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, Vec<A>> for Rc<Count<S, A, P>> {
     fn write(&self, x: &Vec<A>, s: &mut S) -> Result<Vec<u8>, String> {
-        x.into_iter()
+        x.iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat()) // TODO bad performance
@@ -727,7 +724,7 @@ mod tests {
         let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
         assert_eq!(rest, "hello");
 
-        let mut values = vec!['1', '2', '3'];
+        let values = vec!['1', '2', '3'];
         assert_eq!(result, values);
 
         let printed = grammar.print(&values, &mut ()).unwrap();
@@ -749,7 +746,7 @@ mod tests {
         let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
         assert_eq!(rest, "3hello");
 
-        let mut values = vec!['1', '2'];
+        let values = vec!['1', '2'];
         assert_eq!(result, values)
     }
 
@@ -777,7 +774,7 @@ mod tests {
         let grammar = digit().many_till(string("end"));
         let (rest, result) = grammar.parse("46387end", &mut ()).unwrap();
 
-        let mut values = vec!['4', '6', '3', '8', '7'];
+        let values = vec!['4', '6', '3', '8', '7'];
 
         assert_eq!(rest, "");
         assert_eq!(result.0, values);
@@ -792,7 +789,7 @@ mod tests {
         let grammar = digit().many_till(string("end"));
         let (rest, result) = grammar.parse("1342endwawawa", &mut ()).unwrap();
 
-        let mut values = vec!['1', '3', '4', '2'];
+        let values = vec!['1', '3', '4', '2'];
 
         assert_eq!(rest, "wawawa");
         assert_eq!(result.0, values);
