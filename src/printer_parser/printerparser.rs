@@ -50,6 +50,10 @@ pub fn bytes<S>(count: usize) -> impl PrinterParserOps<S, Vec<u8>> {
     ConsumeBytes(count)
 }
 
+pub fn byte<S>() -> impl PrinterParserOps<S, u8> {
+    ConsumeByte
+}
+
 pub fn string<S: 'static>(
     s: &str,
 ) -> impl PrinterParserOps<S, String> + DefaultValue<S, String> + '_ {
@@ -369,6 +373,9 @@ pub struct ConsumeChar;
 pub struct ConsumeBytes(usize);
 
 #[derive(Clone)]
+pub struct ConsumeByte;
+
+#[derive(Clone)]
 pub struct ExpectString<'a>(&'a [u8]);
 
 pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
@@ -487,7 +494,22 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
     }
 }
 
+impl<S> PrinterParser<S, u8> for ConsumeByte {
+    fn write(&self, i: &u8, _: &mut S) -> Result<Vec<u8>, String> {
+        Ok(vec![*i])
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], u8), String> {
+        if i.is_empty() {
+            Err("input has not enough elements left".to_owned())
+        } else {
+            Ok((&i[1..], i[0]))
+        }
+    }
+}
+
 impl<S> PrinterParserOps<S, Vec<u8>> for ConsumeBytes {}
+impl<S> PrinterParserOps<S, u8> for ConsumeByte {}
 
 impl<S> PrinterParser<S, char> for ConsumeChar {
     fn write(&self, i: &char, _: &mut S) -> Result<Vec<u8>, String> {
@@ -658,6 +680,16 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Count<S, A
 mod tests {
     use super::*;
     use crate::printer_parser::primitives::digit;
+
+    #[test]
+    fn test_byte() {
+        let (rest, result) = byte().read(b"dankmeme", &mut ()).unwrap();
+        assert_eq!(rest, b"ankmeme");
+        assert_eq!(result, b'd');
+
+        let printed = byte().write(&b'x', &mut ()).unwrap();
+        assert_eq!(printed, b"x")
+    }
 
     #[test]
     fn test_digit_expected() {
