@@ -1,12 +1,8 @@
-## `nom` subset we're aiming for
-- [x] both big/little endian versions of f32/f64, {u/i}{8/16/32/64}
-- [x] branch::alt
-- [x] multi::count
-- [x] multi::{many0, many1} - `repeat`, `repeat1` here
-- [x] sequence::delimited - `surrounded_by` here
-- [x] sequence::terminated - `followed_by` here
-- [x] combinator::{complete, map} - incomplete parses are automatically errors here (feature or bug? you tell me)
-- [x] bytes::complete::take_while
-- [x] bytes::complete::tag
-- [x] bytes::complete::take_till
-- [ ] bytes::complete::take_until - overlaps with `take_till`?
+## TODO
+- [ ] streaming parsing / printing
+- [ ] combinator that fails of the rest of the input is not empty (`complete` in nom?)
+- [ ] create lib.rs for the parser/printer stuff, and move json to an examples file
+
+## "Research" ideas
+- [ ] a printer that consumes the input (would this require code duplication? how much?)
+- [ ] continuation passing style?
