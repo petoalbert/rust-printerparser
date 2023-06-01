@@ -12,7 +12,8 @@ fn main() {
     let path = args.get(1).expect("No path given").as_str();
     let blend_bytes = from_file(path).expect("cannot unpack blend file");
 
-    let (_, (header, bytes)) = blend().read(&blend_bytes, &mut ()).unwrap();
+    let (rest, (header, bytes)) = blend().read(&blend_bytes, &mut ()).unwrap();
+    assert!(rest.is_empty()); // TODO: this could become its own combinator
     println!("{:?} - {:?}", header, bytes);
 
     let write_back = blend()
