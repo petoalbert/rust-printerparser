@@ -6,7 +6,7 @@ use crate::printer_parser::printerparser::{
 
 #[allow(dead_code)]
 pub fn digit<S>() -> impl PrinterParserOps<S, char> {
-    consume_char.filter(|c| c.is_digit(10))
+    consume_char.filter(|c| c.is_ascii_digit())
 }
 
 #[allow(dead_code)]
