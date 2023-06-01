@@ -1,5 +1,5 @@
+use std::marker::PhantomData;
 use std::rc::Rc;
-use std::{collections::LinkedList, marker::PhantomData};
 
 /*
 Notes:
@@ -144,6 +144,17 @@ where
         Rc::new(ZipWith {
             a: self,
             b: other,
+            phantom: PhantomData,
+        })
+    }
+
+    fn many_till<B, P: PrinterParser<S, B>>(self, other: P) -> Rc<ManyTill<S, A, B, Self, P>>
+    where
+        Self: Sized,
+    {
+        Rc::new(ManyTill {
+            parser: self,
+            end: other,
             phantom: PhantomData,
         })
     }
@@ -366,6 +377,12 @@ pub struct ZipWith<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
     phantom: PhantomData<(A, B, S)>,
 }
 
+pub struct ManyTill<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> {
+    parser: PA,
+    end: PB,
+    phantom: PhantomData<(A, B, S)>,
+}
+
 impl<
         S,
         A,
@@ -538,21 +555,62 @@ impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S,
     }
 }
 
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParser<S, (Vec<A>, B)>
+    for Rc<ManyTill<S, A, B, PA, PB>>
+{
+    fn write(&self, i: &(Vec<A>, B), s: &mut S) -> Result<Vec<u8>, String> {
+        let (a, b) = i;
+        let mut x = a
+            .into_iter()
+            .map(|item| (self.parser).write(item, s))
+            .collect::<Result<Vec<Vec<u8>>, String>>()
+            .map(|vs| vs.concat())?; // TODO bad performance
+        let mut y = (self.end).write(b, s)?;
+        x.append(&mut y); // TODO Vec is not good for performance here
+        Ok(x)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], (Vec<A>, B)), String> {
+        let mut elements = Vec::new();
+        let mut rem = i;
+        loop {
+            let maybe_end = (self.end).read(rem, s);
+            if let Ok((rem1, end)) = maybe_end {
+                return Ok((rem1, (elements, end)));
+            }
+
+            let next = self.parser.read(rem, s);
+            match next {
+                Err(_) => return Err("parser failed".to_owned()),
+                Ok((rem1, a)) => {
+                    elements.push(a);
+                    rem = rem1
+                }
+            }
+        }
+    }
+}
+
 impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (A, B)>
     for Rc<ZipWith<S, A, B, PA, PB>>
 {
 }
 
-impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S, A, P>> {
-    fn write(&self, x: &LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
+impl<S, A, B, PA: PrinterParser<S, A>, PB: PrinterParser<S, B>> PrinterParserOps<S, (Vec<A>, B)>
+    for Rc<ManyTill<S, A, B, PA, PB>>
+{
+}
+
+impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, Vec<A>> for Rc<Rep<S, A, P>> {
+    fn write(&self, x: &Vec<A>, s: &mut S) -> Result<Vec<u8>, String> {
         x.into_iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat()) // TODO bad performance
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], LinkedList<A>), String> {
-        let mut elements = LinkedList::new();
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<A>), String> {
+        let mut elements = Vec::new();
         let mut rem = i;
         loop {
             let res = self.parser.read(rem, s);
@@ -560,26 +618,26 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Rep<S,
                 Err(_) => break,
                 Ok((rem1, a)) => {
                     rem = rem1;
-                    elements.push_front(a);
+                    elements.push(a);
                 }
             }
         }
-        Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
+        Ok((rem, elements))
     }
 }
 
-impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rc<Rep<S, A, P>> {}
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Rep<S, A, P>> {}
 
-impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Count<S, A, P>> {
-    fn write(&self, x: &LinkedList<A>, s: &mut S) -> Result<Vec<u8>, String> {
+impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, Vec<A>> for Rc<Count<S, A, P>> {
+    fn write(&self, x: &Vec<A>, s: &mut S) -> Result<Vec<u8>, String> {
         x.into_iter()
             .map(|item| (self.parser).write(item, s))
             .collect::<Result<Vec<Vec<u8>>, String>>()
             .map(|vs| vs.concat()) // TODO bad performance
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], LinkedList<A>), String> {
-        let mut elements = LinkedList::new();
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<A>), String> {
+        let mut elements = Vec::new();
         let mut rem = i;
 
         for _ in 0..self.times {
@@ -588,16 +646,16 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, LinkedList<A>> for Rc<Count<
                 Err(_) => return Err("count".to_owned()),
                 Ok((rem1, a)) => {
                     rem = rem1;
-                    elements.push_front(a);
+                    elements.push(a);
                 }
             }
         }
 
-        Ok((rem, elements.into_iter().rev().collect::<LinkedList<A>>()))
+        Ok((rem, elements))
     }
 }
 
-impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, LinkedList<A>> for Rc<Count<S, A, P>> {}
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Count<S, A, P>> {}
 
 #[cfg(test)]
 mod tests {
@@ -648,7 +706,7 @@ mod tests {
         let grammar = string("rust").repeat();
 
         let values = vec!["rust".to_owned(), "rust".to_owned(), "rust".to_owned()];
-        let mut list_for_parse = LinkedList::new();
+        let mut list_for_parse = Vec::new();
 
         list_for_parse.extend(values);
 
@@ -658,11 +716,8 @@ mod tests {
         }
 
         let values = vec!["rust".to_owned(), "rust".to_owned()];
-        let mut list_for_print = LinkedList::new();
 
-        list_for_print.extend(values);
-
-        assert_eq!(grammar.print(&list_for_print, &mut ()).unwrap(), "rustrust")
+        assert_eq!(grammar.print(&values, &mut ()).unwrap(), "rustrust")
     }
 
     #[test]
@@ -672,11 +727,10 @@ mod tests {
         let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
         assert_eq!(rest, "hello");
 
-        let mut list = LinkedList::new();
-        list.extend(vec!['1', '2', '3']);
-        assert_eq!(result, list);
+        let mut values = vec!['1', '2', '3'];
+        assert_eq!(result, values);
 
-        let printed = grammar.print(&list, &mut ()).unwrap();
+        let printed = grammar.print(&values, &mut ()).unwrap();
         assert_eq!(printed, "123")
     }
 
@@ -695,9 +749,8 @@ mod tests {
         let (rest, result) = grammar.parse("123hello", &mut ()).unwrap();
         assert_eq!(rest, "3hello");
 
-        let mut list = LinkedList::new();
-        list.extend(vec!['1', '2']);
-        assert_eq!(result, list)
+        let mut values = vec!['1', '2'];
+        assert_eq!(result, values)
     }
 
     #[test]
@@ -717,5 +770,32 @@ mod tests {
         assert!(matches!(grammar.parse("javascript", &mut ()), Err(_)));
         assert_eq!(grammar.print(&parsed_rust, &mut ()).unwrap(), "rust");
         assert_eq!(grammar.print(&parsed_haskell, &mut ()).unwrap(), "haskell");
+    }
+
+    #[test]
+    fn test_many_till() {
+        let grammar = digit().many_till(string("end"));
+        let (rest, result) = grammar.parse("46387end", &mut ()).unwrap();
+
+        let mut values = vec!['4', '6', '3', '8', '7'];
+
+        assert_eq!(rest, "");
+        assert_eq!(result.0, values);
+        assert_eq!(result.1, "end");
+
+        let printed = grammar.print(&(values, "end".to_owned()), &mut ()).unwrap();
+        assert_eq!(printed, "46387end");
+    }
+
+    #[test]
+    fn test_many_till_incomplete() {
+        let grammar = digit().many_till(string("end"));
+        let (rest, result) = grammar.parse("1342endwawawa", &mut ()).unwrap();
+
+        let mut values = vec!['1', '3', '4', '2'];
+
+        assert_eq!(rest, "wawawa");
+        assert_eq!(result.0, values);
+        assert_eq!(result.1, "end");
     }
 }
