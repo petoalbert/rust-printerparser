@@ -1,7 +1,5 @@
 mod printer_parser;
 
-use std::collections::LinkedList;
-
 use crate::printer_parser::combinator::*;
 use crate::printer_parser::primitives::*;
 use crate::printer_parser::printerparser::*;
@@ -12,8 +10,8 @@ enum JSON {
     Boolean(bool),
     Number(i64),
     String(String),
-    Array(LinkedList<JSON>),
-    Object(LinkedList<(String, JSON)>),
+    Array(Vec<JSON>),
+    Object(Vec<(String, JSON)>),
 }
 
 fn whitespace() -> impl PrinterParserOps<(), String> + DefaultValue<(), String> {

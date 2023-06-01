@@ -1,5 +1,5 @@
 use crate::printer_parser::printerparser::{DefaultValue, MapResult, PrinterParserOps, ZipWith};
-use std::{collections::LinkedList, rc::Rc};
+use std::rc::Rc;
 
 pub fn preceded_by<
     S,
@@ -36,16 +36,17 @@ pub fn followed_by<
 #[allow(dead_code)]
 pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
     combinator: PA,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, Vec<A>> {
     let c2 = combinator.clone();
 
     combinator.zip_with(c2.repeat()).map_result(
-        |(a, mut aa), _| {
-            aa.push_front(a);
-            Ok(aa)
+        |(v, mut vs), _| {
+            let mut vec = vec![v];
+            vec.append(&mut vs);
+            Ok(vec)
         },
         |a, _| {
-            a.front()
+            a.first()
                 .ok_or("At least one element required".to_owned())
                 .map(|front| (front.clone(), a.clone().split_off(1)))
         },
@@ -56,14 +57,14 @@ pub fn repeat1<S, A: Clone, PA: PrinterParserOps<S, A>>(
 pub fn take_while<S, A: Clone, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone + 'static>(
     parser: PA,
     predicate: F,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, Vec<A>> {
     parser.filter(predicate).repeat()
 }
 
 pub fn take_till<S, A: Clone, PA: PrinterParserOps<S, A>, F: Fn(&A) -> bool + Clone + 'static>(
     parser: PA,
     predicate: F,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, Vec<A>> {
     parser.filter(move |a| !predicate(a)).repeat()
 }
 
@@ -118,15 +119,16 @@ pub fn separated_list<
 >(
     parser: PA,
     sep: PB,
-) -> impl PrinterParserOps<S, LinkedList<A>> {
+) -> impl PrinterParserOps<S, Vec<A>> {
     let successors = preceded_by(sep, parser.clone()).repeat();
     parser.zip_with(successors).map_result(
         |(v, mut vs), _| {
-            vs.push_front(v);
-            Ok(vs)
+            let mut vec = vec![v];
+            vec.append(&mut vs);
+            Ok(vec)
         },
         |a, _| {
-            a.front()
+            a.first()
                 .ok_or("At least one element required".to_owned())
                 .map(|front| (front.clone(), a.clone().split_off(1)))
         },
@@ -177,7 +179,7 @@ pub fn tuple4<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::printer_parser::primitives::char;
+    use crate::printer_parser::primitives::{char, digit};
     use crate::printer_parser::printerparser::{consume_char, string, PrinterParser};
 
     #[test]
@@ -194,20 +196,20 @@ mod tests {
 
     #[test]
     fn test_repeat1() {
-        let grammar = repeat1(string("rust"));
-        let values = vec!["rust".to_owned(), "rust".to_owned()];
-        let mut list_for_parse = LinkedList::new();
+        let grammar = repeat1(consume_char.count(4)).map(
+            |p| -> Vec<String> { p.into_iter().map(|w| w.into_iter().collect()).collect() },
+            |p| -> Vec<Vec<char>> {
+                p.into_iter()
+                    .map(|w| w.chars().into_iter().collect())
+                    .collect()
+            },
+        );
+        let values = vec!["rust".to_owned(), "lisp".to_owned(), "hack".to_owned()];
 
-        list_for_parse.extend(values);
-
-        match grammar.parse("rustrust", &mut ()) {
-            Ok(("", result)) => assert_eq!(result, list_for_parse),
+        match grammar.parse("rustlisphack", &mut ()) {
+            Ok(("", result)) => assert_eq!(result, values),
             _ => panic!("Unexpected value"),
         }
-
-        let values = vec![()];
-        let mut list_for_parse2 = LinkedList::new();
-        list_for_parse2.extend(values);
 
         assert!(matches!(grammar.parse("", &mut ()), Err(_)))
     }
@@ -216,17 +218,14 @@ mod tests {
     fn test_take_while() {
         let grammar = take_while(consume_char, |a| a.is_digit(10));
         let values = vec!['1', '2', '3'];
-        let mut list_for_parse = LinkedList::new();
-
-        list_for_parse.extend(values);
 
         match grammar.parse("123aaaa", &mut ()) {
-            Ok(("aaaa", result)) => assert_eq!(result, list_for_parse),
+            Ok(("aaaa", result)) => assert_eq!(result, values),
             v => panic!("Unexpected value {:?}", v),
         }
 
         match grammar.parse("aaaa", &mut ()) {
-            Ok(("aaaa", result)) => assert_eq!(result, LinkedList::new()),
+            Ok(("aaaa", result)) => assert_eq!(result, vec![]),
             v => panic!("Unexpected value {:?}", v),
         }
     }
@@ -235,12 +234,11 @@ mod tests {
     fn test_take_till() {
         let grammar = take_till(consume_char, |a| a.is_ascii_punctuation());
         let (rest, result) = grammar.parse("shut! up", &mut ()).unwrap();
-        let mut list = LinkedList::new();
-        list.extend(vec!['s', 'h', 'u', 't']);
+        let values = vec!['s', 'h', 'u', 't'];
         assert_eq!(rest, "! up");
-        assert_eq!(result, list);
+        assert_eq!(result, values);
 
-        let printed = grammar.print(&list, &mut ()).unwrap();
+        let printed = grammar.print(&values, &mut ()).unwrap();
         assert_eq!(printed, "shut")
     }
 
