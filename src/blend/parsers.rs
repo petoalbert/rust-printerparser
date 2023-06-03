@@ -153,7 +153,7 @@ pub fn block() -> impl PrinterParserOps<BlendFileParseState, SimpleParsedBlock> 
 pub fn blend() -> impl PrinterParserOps<BlendFileParseState, (Header, Vec<SimpleParsedBlock>)> {
     let body = block()
         .many_till(tag(b"ENDB"))
-        .complete()
+        // .complete() // TODO: debug why there's data at the end
         .map(|(bs, _)| bs, |bs| (bs.clone(), b"ENDB".to_vec()));
 
     header().zip_with(body)

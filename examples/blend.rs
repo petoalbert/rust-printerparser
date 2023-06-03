@@ -22,11 +22,11 @@ fn main() {
         current_block_size: 0,
     };
 
-    let (_, (header, bytes)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
-    println!("{:?} - {:?}", header, bytes);
+    let (_, (header, blocks)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
+    println!("{:?} - {:?}", header, blocks.len());
 
     let write_back = blend()
-        .write(&(header, bytes), &mut parse_state)
+        .write(&(header, blocks), &mut parse_state)
         .expect("cannot serialize blender file");
     to_file(to_path, write_back).expect("cannot write to file")
 }
