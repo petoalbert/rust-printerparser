@@ -69,6 +69,7 @@ pub fn header() -> impl PrinterParserOps<BlendFileParseState, Header> {
 pub fn blend() -> impl PrinterParserOps<BlendFileParseState, (Header, Vec<u8>)> {
     let body = byte()
         .many_till(tag(b"ENDB"))
+        .complete()
         .map(|(bs, _)| bs, |bs| (bs.clone(), b"ENDB".to_vec()));
 
     header().zip_with(body)
