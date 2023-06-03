@@ -181,11 +181,11 @@ where
         })
     }
 
-    fn as_string(self) -> Rc<MapResult<S, A, String, Self>>
+    fn as_string(into_self: Self) -> Rc<MapResult<S, A, String, Self>>
     where
         A: IntoIterator<Item = char> + FromIterator<char>,
     {
-        self.map(
+        into_self.map(
             |cs| cs.into_iter().collect(),
             |s: &String| s.chars().collect(),
         )
@@ -193,12 +193,12 @@ where
 
     #[deprecated]
     fn as_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
-        self,
+        into_self: Self,
         read_state: F,
         write_state: G,
     ) -> Rc<State<S, A, F, G, Self>> {
         Rc::new(State {
-            parser: self,
+            parser: into_self,
             read_state,
             write_state,
             phantom: PhantomData,
@@ -213,16 +213,19 @@ where
         })
     }
 
-    fn as_value<B: Clone + PartialEq + 'static>(self, b: B) -> Rc<MapResult<S, A, B, Self>>
+    fn as_value<B: Clone + PartialEq + 'static>(
+        into_self: Self,
+        b: B,
+    ) -> Rc<MapResult<S, A, B, Self>>
     where
         Self: DefaultValue<S, A> + 'static,
     {
         let cloned = b.clone();
-        self.clone().map_result(
+        into_self.clone().map_result(
             move |_, _| Ok(cloned.clone()), // TODO
             move |v, s| {
                 if *v == b {
-                    self.value(s)
+                    into_self.value(s)
                 } else {
                     Err("Not matching".to_owned())
                 }
@@ -444,7 +447,7 @@ impl<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParserOps<S,
 }
 
 impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
-    fn write(&self, v: &Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, v: &Vec<u8>, _s: &mut S) -> Result<Vec<u8>, String> {
         if v == self.0 {
             Ok(self.0.to_vec())
         } else {
@@ -475,7 +478,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
         Ok(i.clone())
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
+    fn read<'a>(&self, i: &'a [u8], _s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
         if i.len() < self.0 {
             Err("input has not enough elements left".to_owned())
         } else {
@@ -489,7 +492,7 @@ impl<S> PrinterParser<S, u8> for ConsumeByte {
         Ok(vec![*i])
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], u8), String> {
+    fn read<'a>(&self, i: &'a [u8], _s: &mut S) -> Result<(&'a [u8], u8), String> {
         if i.is_empty() {
             Err("input has not enough elements left".to_owned())
         } else {
@@ -669,7 +672,11 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Count<S, A
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::printer_parser::primitives::digit;
+    use crate::printer_parser::{
+        combinator::preceded_by,
+        numbers::{i32, Endianness},
+        primitives::digit,
+    };
 
     #[test]
     fn test_byte() {
@@ -848,5 +855,39 @@ mod tests {
 
         let printed = grammar.print(&res, &mut 0).unwrap();
         assert_eq!(printed, "5asdfg")
+    }
+
+    #[test]
+    fn test_state() {
+        let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
+        let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
+
+        let endianness = bytes(1).as_state(
+            |bs, s: &mut Endianness| match bs.first().unwrap() {
+                0 => {
+                    *s = Endianness::LittleEndian;
+                    Ok(())
+                }
+                1 => {
+                    *s = Endianness::BigEndindan;
+                    Ok(())
+                }
+                _ => Err("Unreadable endianness".to_owned()),
+            },
+            |s: &Endianness| match s {
+                Endianness::LittleEndian => Ok([0].to_vec()),
+                Endianness::BigEndindan => Ok([1].to_vec()),
+            },
+        );
+
+        let grammar = preceded_by(endianness, i32());
+
+        let mut parsed_state = Endianness::LittleEndian;
+        let (_, i) = grammar.read(&be_bytes, &mut parsed_state).unwrap();
+        let result_bytes = grammar.write(&i, &mut Endianness::LittleEndian).unwrap();
+
+        assert_eq!(parsed_state, Endianness::BigEndindan);
+        assert_eq!(i, 67_305_985);
+        assert_eq!(result_bytes, le_bytes);
     }
 }

@@ -1,8 +1,6 @@
-mod printer_parser;
-
-use crate::printer_parser::combinator::*;
-use crate::printer_parser::primitives::*;
-use crate::printer_parser::printerparser::*;
+use parserprinter::printer_parser::combinator::*;
+use parserprinter::printer_parser::primitives::*;
+use parserprinter::printer_parser::printerparser::*;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq)]

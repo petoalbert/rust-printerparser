@@ -179,7 +179,7 @@ pub fn tuple4<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::printer_parser::primitives::{char, digit};
+    use crate::printer_parser::primitives::char;
     use crate::printer_parser::printerparser::{consume_char, string, PrinterParser};
 
     #[test]
@@ -198,11 +198,7 @@ mod tests {
     fn test_repeat1() {
         let grammar = repeat1(consume_char.count(4)).map(
             |p| -> Vec<String> { p.into_iter().map(|w| w.into_iter().collect()).collect() },
-            |p| -> Vec<Vec<char>> {
-                p.into_iter()
-                    .map(|w| w.chars().into_iter().collect())
-                    .collect()
-            },
+            |p| -> Vec<Vec<char>> { p.iter().map(|w| w.chars().collect()).collect() },
         );
         let values = vec!["rust".to_owned(), "lisp".to_owned(), "hack".to_owned()];
 
@@ -216,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_take_while() {
-        let grammar = take_while(consume_char, |a| a.is_digit(10));
+        let grammar = take_while(consume_char, |a| a.is_ascii_digit());
         let values = vec!['1', '2', '3'];
 
         match grammar.parse("123aaaa", &mut ()) {
