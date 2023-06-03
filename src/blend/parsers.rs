@@ -7,29 +7,29 @@ use crate::blend::blend::{Endianness, Header, PointerSize};
 type BlendFileParseState = ();
 
 pub fn pointer_size() -> impl PrinterParserOps<BlendFileParseState, PointerSize> {
-    bytes(1).map_result(
-        |byte, _| match byte.first() {
-            Some(b'_') => Ok(PointerSize::Bits32),
-            Some(b'-') => Ok(PointerSize::Bits64),
+    byte().map_result(
+        |byte, _| match byte {
+            b'_' => Ok(PointerSize::Bits32),
+            b'-' => Ok(PointerSize::Bits64),
             _ => Err("Invalid pointer size marker".to_owned()),
         },
         |pointer_size, _| match pointer_size {
-            PointerSize::Bits32 => Ok(b"_".to_vec()),
-            PointerSize::Bits64 => Ok(b"-".to_vec()),
+            PointerSize::Bits32 => Ok(b'_'),
+            PointerSize::Bits64 => Ok(b'-'),
         },
     )
 }
 
 pub fn endianness() -> impl PrinterParserOps<BlendFileParseState, Endianness> {
-    bytes(1).map_result(
-        |byte, _| match byte.first() {
-            Some(b'v') => Ok(Endianness::Little),
-            Some(b'V') => Ok(Endianness::Big),
+    byte().map_result(
+        |byte, _| match byte {
+            b'v' => Ok(Endianness::Little),
+            b'V' => Ok(Endianness::Big),
             _ => Err("Invalid pointer size marker".to_owned()),
         },
         |pointer_size, _| match pointer_size {
-            Endianness::Little => Ok(b"v".to_vec()),
-            Endianness::Big => Ok(b"V".to_vec()),
+            Endianness::Little => Ok(b'v'),
+            Endianness::Big => Ok(b'V'),
         },
     )
 }
