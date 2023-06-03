@@ -1,10 +1,13 @@
 use crate::printer_parser::combinator::*;
-use crate::printer_parser::primitives::*;
 use crate::printer_parser::printerparser::*;
 
 use crate::blend::blend::{Endianness, Header, PointerSize};
 
-type BlendFileParseState = ();
+pub struct BlendFileParseState {
+    pub pointer_size: PointerSize,
+    pub endianness: Endianness,
+    pub current_block_size: u64,
+}
 
 pub fn pointer_size() -> impl PrinterParserOps<BlendFileParseState, PointerSize> {
     byte().map_result(
@@ -45,23 +48,29 @@ pub fn version() -> impl PrinterParserOps<BlendFileParseState, [u8; 3]> {
 }
 
 pub fn header() -> impl PrinterParserOps<BlendFileParseState, Header> {
-    tuple4(tag(b"BLENDER"), pointer_size(), endianness(), version()).map(
-        |(_, ps, e, v)| Header {
-            pointer_size: ps,
-            endianness: e,
-            version: v,
+    tuple4(tag(b"BLENDER"), pointer_size(), endianness(), version()).map_result(
+        |(_, ps, e, v), state| {
+            state.endianness = e;
+            state.pointer_size = ps;
+
+            Ok(Header {
+                pointer_size: ps,
+                endianness: e,
+                version: v,
+            })
         },
         |Header {
              pointer_size,
              endianness,
              version,
-         }| {
-            (
+         },
+         _| {
+            Ok((
                 b"BLENDER".to_vec(),
                 (*pointer_size),
                 (*endianness),
                 (*version),
-            )
+            ))
         },
     )
 }

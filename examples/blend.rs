@@ -1,5 +1,9 @@
 use parserprinter::{
-    blend::{parsers::blend, utils::from_file},
+    blend::{
+        blend::{Endianness, PointerSize},
+        parsers::{blend, BlendFileParseState},
+        utils::from_file,
+    },
     printer_parser::printerparser::PrinterParser,
 };
 use std::env;
@@ -12,11 +16,17 @@ fn main() {
     let to_path = args.get(2).expect("No path given").as_str();
     let blend_bytes = from_file(from_path).expect("cannot unpack blend file");
 
-    let (_, (header, bytes)) = blend().read(&blend_bytes, &mut ()).unwrap();
+    let mut parse_state = BlendFileParseState {
+        pointer_size: PointerSize::Bits32,
+        endianness: Endianness::Little,
+        current_block_size: 0,
+    };
+
+    let (_, (header, bytes)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
     println!("{:?} - {:?}", header, bytes);
 
     let write_back = blend()
-        .write(&(header, bytes), &mut ())
+        .write(&(header, bytes), &mut parse_state)
         .expect("cannot serialize blender file");
     to_file(to_path, write_back).expect("cannot write to file")
 }
