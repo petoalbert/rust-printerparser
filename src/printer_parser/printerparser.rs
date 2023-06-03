@@ -68,6 +68,27 @@ pub trait DefaultValue<S, A> {
     fn value(&self, s: &mut S) -> Result<A, String>;
 }
 
+pub struct Complete<S, A, P: PrinterParser<S, A>> {
+    parser: P,
+    phantom: PhantomData<(A, S)>,
+}
+
+impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, A> for Rc<Complete<S, A, P>> {
+    fn write(&self, i: &A, s: &mut S) -> Result<Vec<u8>, String> {
+        (self.parser).write(i, s)
+    }
+
+    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], A), String> {
+        let (rest, res) = (self.parser).read(i, s)?;
+        match rest.is_empty() {
+            true => Ok((rest, res)),
+            false => Err("Unparsed data found".to_owned()),
+        }
+    }
+}
+
+impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, A> for Rc<Complete<S, A, P>> {}
+
 pub trait PrinterParserOps<S, A>
 where
     Self: PrinterParser<S, A> + Clone,
@@ -228,6 +249,13 @@ where
                 }
             },
         )
+    }
+
+    fn complete(self) -> Rc<Complete<S, A, Self>> {
+        Rc::new(Complete {
+            parser: self,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -886,5 +914,22 @@ mod tests {
         assert_eq!(parsed_state, Endianness::BigEndindan);
         assert_eq!(i, 67_305_985);
         assert_eq!(result_bytes, le_bytes);
+    }
+
+    #[test]
+    fn test_complete() {
+        let grammar = digit().repeat().complete();
+        let (_, result) = grammar.parse("123", &mut ()).unwrap();
+        assert_eq!(result, vec!['1', '2', '3']);
+
+        let printed = grammar.print(&result, &mut ()).unwrap();
+        assert_eq!(printed, "123")
+    }
+
+    #[test]
+    fn test_complete_incomplete() {
+        let grammar = digit().repeat().complete();
+        let result = grammar.parse("123aa", &mut ());
+        assert!(matches!(result, Err(_)));
     }
 }
