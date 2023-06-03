@@ -13,3 +13,17 @@ pub fn digit<S>() -> impl PrinterParserOps<S, char> {
 pub fn char<S>(c: char) -> Rc<Default<S, char, Rc<MapResult<S, char, char, ConsumeChar>>>> {
     consume_char.filter(move |x| x == &c).default(c)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::printer_parser::printerparser::PrinterParser;
+
+    use super::*;
+
+    #[test]
+    fn test_digit_expected() {
+        assert!(matches!(digit().parse("2", &mut ()), Ok(("", '2'))));
+        assert!(matches!(digit().parse("a", &mut ()), Err(_)));
+        assert_eq!(digit().print(&'2', &mut ()).unwrap(), "2")
+    }
+}

@@ -1,17 +1,6 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-/*
-Notes:
-
-Not having a flat_map has some limitations: it would be difficult to parse using some context, e.g.
-something like python/yaml where the indentation is increased at every level. We could add a state parameter
-to print/parse to overcome that limitation, just like parserz does.
-
- */
-
-// Helper functions
-
 #[allow(non_upper_case_globals)]
 pub const consume_char: ConsumeChar = ConsumeChar;
 
@@ -76,7 +65,7 @@ pub fn tag<S: 'static>(
 }
 
 pub trait DefaultValue<S, A> {
-    fn value(&self, s: &S) -> Result<A, String>;
+    fn value(&self, s: &mut S) -> Result<A, String>;
 }
 
 pub trait PrinterParserOps<S, A>
@@ -123,8 +112,8 @@ where
 
     fn map_result<
         B,
-        F: Fn(A, &S) -> Result<B, String> + 'static,
-        G: Fn(&B, &S) -> Result<A, String> + 'static,
+        F: Fn(A, &mut S) -> Result<B, String> + 'static,
+        G: Fn(&B, &mut S) -> Result<A, String> + 'static,
     >(
         self,
         f: F,
@@ -192,7 +181,7 @@ where
         })
     }
 
-    fn as_string(self) -> Rc<MapResult<S, A, String, Self>>
+    fn into_string(self) -> Rc<MapResult<S, A, String, Self>>
     where
         A: IntoIterator<Item = char> + FromIterator<char>,
     {
@@ -202,7 +191,8 @@ where
         )
     }
 
-    fn as_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
+    #[deprecated]
+    fn into_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
         self,
         read_state: F,
         write_state: G,
@@ -223,7 +213,7 @@ where
         })
     }
 
-    fn as_value<B: Clone + PartialEq + 'static>(self, b: B) -> Rc<MapResult<S, A, B, Self>>
+    fn into_value<B: Clone + PartialEq + 'static>(self, b: B) -> Rc<MapResult<S, A, B, Self>>
     where
         Self: DefaultValue<S, A> + 'static,
     {
@@ -324,7 +314,7 @@ impl<
         P: PrinterParser<S, A>,
     > DefaultValue<S, ()> for Rc<State<S, A, F, G, P>>
 {
-    fn value(&self, _: &S) -> Result<(), String> {
+    fn value(&self, _: &mut S) -> Result<(), String> {
         Ok(())
     }
 }
@@ -361,8 +351,8 @@ pub struct Alt<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> {
 
 pub struct MapResult<S, A, B, P: PrinterParser<S, A> + Sized> {
     parser: P,
-    f: Rc<dyn Fn(A, &S) -> Result<B, String>>,
-    g: Rc<dyn Fn(&B, &S) -> Result<A, String>>,
+    f: Rc<dyn Fn(A, &mut S) -> Result<B, String>>,
+    g: Rc<dyn Fn(&B, &mut S) -> Result<A, String>>,
     phantom: PhantomData<(A, B, S)>,
 }
 
@@ -398,7 +388,7 @@ impl<
         PB: PrinterParser<S, B> + DefaultValue<S, B>,
     > DefaultValue<S, (A, B)> for Rc<ZipWith<S, A, B, PA, PB>>
 {
-    fn value(&self, s: &S) -> Result<(A, B), String> {
+    fn value(&self, s: &mut S) -> Result<(A, B), String> {
         let a = self.a.value(s)?;
         let b = self.b.value(s)?;
         Ok((a, b))
@@ -431,7 +421,7 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParser<S, A> for Rc<Default<S, A, P>> 
 impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, A> for Rc<Default<S, A, P>> {}
 
 impl<S, A: Clone, P: PrinterParser<S, A>> DefaultValue<S, A> for Rc<Default<S, A, P>> {
-    fn value(&self, _: &S) -> Result<A, String> {
+    fn value(&self, _: &mut S) -> Result<A, String> {
         Ok(self.value.clone())
     }
 }
@@ -454,7 +444,7 @@ impl<S, A, PA: PrinterParser<S, A>, PB: PrinterParser<S, A>> PrinterParserOps<S,
 }
 
 impl<'a, S> PrinterParser<S, Vec<u8>> for ExpectString<'a> {
-    fn write(&self, v: &Vec<u8>, s: &mut S) -> Result<Vec<u8>, String> {
+    fn write(&self, v: &Vec<u8>, _s: &mut S) -> Result<Vec<u8>, String> {
         if v == self.0 {
             Ok(self.0.to_vec())
         } else {
@@ -485,7 +475,7 @@ impl<S> PrinterParser<S, Vec<u8>> for ConsumeBytes {
         Ok(i.clone())
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
+    fn read<'a>(&self, i: &'a [u8], _s: &mut S) -> Result<(&'a [u8], Vec<u8>), String> {
         if i.len() < self.0 {
             Err("input has not enough elements left".to_owned())
         } else {
@@ -499,7 +489,7 @@ impl<S> PrinterParser<S, u8> for ConsumeByte {
         Ok(vec![*i])
     }
 
-    fn read<'a>(&self, i: &'a [u8], s: &mut S) -> Result<(&'a [u8], u8), String> {
+    fn read<'a>(&self, i: &'a [u8], _s: &mut S) -> Result<(&'a [u8], u8), String> {
         if i.is_empty() {
             Err("input has not enough elements left".to_owned())
         } else {
@@ -550,7 +540,7 @@ impl<S, A, B, P: PrinterParser<S, A>> PrinterParserOps<S, B> for Rc<MapResult<S,
 impl<S, A, B, P: PrinterParser<S, A> + DefaultValue<S, A>> DefaultValue<S, B>
     for Rc<MapResult<S, A, B, P>>
 {
-    fn value(&self, s: &S) -> Result<B, String> {
+    fn value(&self, s: &mut S) -> Result<B, String> {
         let a = self.parser.value(s)?;
         (self.f)(a, s)
     }
@@ -679,7 +669,11 @@ impl<S, A, P: PrinterParser<S, A>> PrinterParserOps<S, Vec<A>> for Rc<Count<S, A
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::printer_parser::primitives::digit;
+    use crate::printer_parser::{
+        combinator::preceded_by,
+        numbers::{i32, Endianness},
+        primitives::digit,
+    };
 
     #[test]
     fn test_byte() {
@@ -826,5 +820,71 @@ mod tests {
         assert_eq!(rest, "wawawa");
         assert_eq!(result.0, values);
         assert_eq!(result.1, "end");
+    }
+
+    #[test]
+    fn test_flat_map() {
+        type State = usize;
+
+        let size = digit().map_result(
+            |d: char, state: &mut State| match d.to_digit(10) {
+                Some(n) => {
+                    let s: usize = n.try_into().expect("");
+                    *state = s;
+                    Ok(s)
+                }
+                _ => Err("Not a digit".to_owned()),
+            },
+            |g, _| {
+                g.to_string()
+                    .chars()
+                    .next()
+                    .ok_or("no digits in number???".to_owned())
+            },
+        );
+
+        let n_chars = map_state(|s: &mut State| Box::new(consume_char.count(*s)));
+
+        let grammar = size.zip_with(n_chars);
+        let (rest, res) = grammar.parse("5asdfg", &mut 0).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(res, (5, vec!['a', 's', 'd', 'f', 'g',]));
+
+        let printed = grammar.print(&res, &mut 0).unwrap();
+        assert_eq!(printed, "5asdfg")
+    }
+
+    #[test]
+    fn test_state() {
+        let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
+        let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
+
+        let endianness = bytes(1).into_state(
+            |bs, s: &mut Endianness| match bs.first().unwrap() {
+                0 => {
+                    *s = Endianness::LittleEndian;
+                    Ok(())
+                }
+                1 => {
+                    *s = Endianness::BigEndindan;
+                    Ok(())
+                }
+                _ => Err("Unreadable endianness".to_owned()),
+            },
+            |s: &Endianness| match s {
+                Endianness::LittleEndian => Ok([0].to_vec()),
+                Endianness::BigEndindan => Ok([1].to_vec()),
+            },
+        );
+
+        let grammar = preceded_by(endianness, i32());
+
+        let mut parsed_state = Endianness::LittleEndian;
+        let (_, i) = grammar.read(&be_bytes, &mut parsed_state).unwrap();
+        let result_bytes = grammar.write(&i, &mut Endianness::LittleEndian).unwrap();
+
+        assert_eq!(parsed_state, Endianness::BigEndindan);
+        assert_eq!(i, 67_305_985);
+        assert_eq!(result_bytes, le_bytes);
     }
 }
