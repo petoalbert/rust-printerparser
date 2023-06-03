@@ -16,19 +16,19 @@ fn whitespace() -> impl PrinterParserOps<(), String> + DefaultValue<(), String> 
     consume_char
         .filter(|&c| c == ' ' || c == '\t' || c == '\n')
         .repeat()
-        .as_string()
+        .into_string()
         .default("".to_owned())
 }
 
 fn parse_boolean() -> impl PrinterParserOps<(), JSON> {
-    let parse_true = string("true").as_value(JSON::Boolean(true));
-    let parse_false = string("false").as_value(JSON::Boolean(false));
+    let parse_true = string("true").into_value(JSON::Boolean(true));
+    let parse_false = string("false").into_value(JSON::Boolean(false));
 
     parse_true.or(parse_false)
 }
 
 fn parse_number() -> impl PrinterParserOps<(), JSON> {
-    repeat1(digit()).as_string().map_result(
+    repeat1(digit()).into_string().map_result(
         |value, _| {
             value
                 .parse::<i64>()
@@ -48,7 +48,7 @@ fn parse_string_literal() -> impl PrinterParserOps<(), String> {
         consume_char.filter(|c| *c != '"').repeat(),
         char('"'),
     )
-    .as_string()
+    .into_string()
 }
 
 fn parse_string() -> impl PrinterParserOps<(), JSON> {

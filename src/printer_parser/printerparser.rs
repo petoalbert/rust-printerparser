@@ -181,24 +181,24 @@ where
         })
     }
 
-    fn as_string(into_self: Self) -> Rc<MapResult<S, A, String, Self>>
+    fn into_string(self) -> Rc<MapResult<S, A, String, Self>>
     where
         A: IntoIterator<Item = char> + FromIterator<char>,
     {
-        into_self.map(
+        self.map(
             |cs| cs.into_iter().collect(),
             |s: &String| s.chars().collect(),
         )
     }
 
     #[deprecated]
-    fn as_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
-        into_self: Self,
+    fn into_state<F: Fn(A, &mut S) -> Result<(), String>, G: Fn(&S) -> Result<A, String>>(
+        self,
         read_state: F,
         write_state: G,
     ) -> Rc<State<S, A, F, G, Self>> {
         Rc::new(State {
-            parser: into_self,
+            parser: self,
             read_state,
             write_state,
             phantom: PhantomData,
@@ -213,19 +213,16 @@ where
         })
     }
 
-    fn as_value<B: Clone + PartialEq + 'static>(
-        into_self: Self,
-        b: B,
-    ) -> Rc<MapResult<S, A, B, Self>>
+    fn into_value<B: Clone + PartialEq + 'static>(self, b: B) -> Rc<MapResult<S, A, B, Self>>
     where
         Self: DefaultValue<S, A> + 'static,
     {
         let cloned = b.clone();
-        into_self.clone().map_result(
+        self.clone().map_result(
             move |_, _| Ok(cloned.clone()), // TODO
             move |v, s| {
                 if *v == b {
-                    into_self.value(s)
+                    self.value(s)
                 } else {
                     Err("Not matching".to_owned())
                 }
@@ -862,7 +859,7 @@ mod tests {
         let le_bytes: [u8; 5] = [0, 1, 2, 3, 4];
         let be_bytes: [u8; 5] = [1, 4, 3, 2, 1];
 
-        let endianness = bytes(1).as_state(
+        let endianness = bytes(1).into_state(
             |bs, s: &mut Endianness| match bs.first().unwrap() {
                 0 => {
                     *s = Endianness::LittleEndian;
