@@ -2,7 +2,37 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs::File;
-use std::io::{Error, Read, Seek, Write};
+use std::io::{Error, Read, Write};
+
+use crate::printer_parser::printerparser::PrinterParserOps;
+
+#[derive(Debug, Copy, Clone)]
+pub enum Either<Left, Right> {
+    Left(Left),
+    Right(Right),
+}
+
+pub fn to_left<S, A: Clone, B, P: PrinterParserOps<S, A>>(p: P) -> impl PrinterParserOps<S, Either<A, B>> {
+    p.map_result(
+        |result, _| Ok(Either::Left(result)),
+        |either, _| match either {
+            Either::Left(value) => Ok(value.clone()),
+            _ => Err("Either::Right found".to_owned()),
+        },
+    )
+}
+
+pub fn to_right<S, A, B: Clone, P: PrinterParserOps<S, B>>(
+    p: P,
+) -> impl PrinterParserOps<S, Either<A, B>> {
+    p.map_result(
+        |result, _| Ok(Either::Right(result)),
+        |either, _| match either {
+            Either::Right(value) => Ok(value.clone()),
+            _ => Err("Either::Left found".to_owned()),
+        },
+    )
+}
 
 pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
     println!("{}", path);

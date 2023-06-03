@@ -1,3 +1,4 @@
+use super::utils::Either;
 use std::{fmt::Debug, num::NonZeroU64};
 
 #[derive(Debug, Copy, Clone)]
@@ -107,4 +108,14 @@ pub struct RawBlend {
     pub header: Header,
     pub blocks: Vec<Block>,
     pub dna: Dna,
+}
+
+#[derive(Debug, Clone)]
+pub struct SimpleParsedBlock {
+    pub code: [u8; 4],
+    pub size: u32,
+    pub memory_address: Either<u32, u64>,
+    pub dna_index: u32,
+    pub count: u32,
+    pub data: Vec<u8>,
 }
