@@ -10,21 +10,21 @@ pub fn le_f32<S>() -> impl PrinterParserOps<S, f32> {
 }
 
 pub fn le_f64<S>() -> impl PrinterParserOps<S, f64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| f64::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
 }
 
 pub fn le_i8<S>() -> impl PrinterParserOps<S, i8> {
-    bytes(4).map(
+    bytes(1).map(
         |b| i8::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
 }
 
 pub fn le_i16<S>() -> impl PrinterParserOps<S, i16> {
-    bytes(4).map(
+    bytes(2).map(
         |b| i16::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
@@ -38,14 +38,14 @@ pub fn le_i32<S>() -> impl PrinterParserOps<S, i32> {
 }
 
 pub fn le_i64<S>() -> impl PrinterParserOps<S, i64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| i64::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
 }
 
 pub fn le_u16<S>() -> impl PrinterParserOps<S, u16> {
-    bytes(4).map(
+    bytes(2).map(
         |b| u16::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
@@ -59,7 +59,7 @@ pub fn le_u32<S>() -> impl PrinterParserOps<S, u32> {
 }
 
 pub fn le_u64<S>() -> impl PrinterParserOps<S, u64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| u64::from_le_bytes(b.try_into().unwrap()),
         |&i| i.to_le_bytes().to_vec(),
     )
@@ -68,14 +68,14 @@ pub fn le_u64<S>() -> impl PrinterParserOps<S, u64> {
 // big endian number types
 
 pub fn be_i8<S>() -> impl PrinterParserOps<S, i8> {
-    bytes(4).map(
+    bytes(1).map(
         |b| i8::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
 }
 
 pub fn be_i16<S>() -> impl PrinterParserOps<S, i16> {
-    bytes(4).map(
+    bytes(2).map(
         |b| i16::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
@@ -89,14 +89,14 @@ pub fn be_i32<S>() -> impl PrinterParserOps<S, i32> {
 }
 
 pub fn be_i64<S>() -> impl PrinterParserOps<S, i64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| i64::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
 }
 
 pub fn be_u16<S>() -> impl PrinterParserOps<S, u16> {
-    bytes(4).map(
+    bytes(2).map(
         |b| u16::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
@@ -110,7 +110,7 @@ pub fn be_u32<S>() -> impl PrinterParserOps<S, u32> {
 }
 
 pub fn be_u64<S>() -> impl PrinterParserOps<S, u64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| u64::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
@@ -124,7 +124,7 @@ pub fn be_f32<S>() -> impl PrinterParserOps<S, f32> {
 }
 
 pub fn be_f64<S>() -> impl PrinterParserOps<S, f64> {
-    bytes(4).map(
+    bytes(8).map(
         |b| f64::from_be_bytes(b.try_into().unwrap()),
         |&i| i.to_be_bytes().to_vec(),
     )
@@ -216,6 +216,21 @@ mod tests {
 
         assert_eq!(i_le, 67_305_985);
         assert_eq!(i_be, 16_909_060);
+        assert_eq!(bytes_le, bytes);
+        assert_eq!(bytes_be, bytes);
+    }
+
+    #[test]
+    fn test_i64() {
+        let bytes: [u8; 8] = [1, 2, 3, 4, 2, 3, 4, 1]; // 1 + 2*2^8 + 3*2^16 + 4*2^24 4 + 3*2^8 + 2*2^16 + 2^24
+
+        let (_, i_le) = i64().read(&bytes, &mut Endianness::LittleEndian).unwrap();
+        let (_, i_be) = i64().read(&bytes, &mut Endianness::BigEndindan).unwrap();
+        let bytes_le = i64().write(&i_le, &mut Endianness::LittleEndian).unwrap();
+        let bytes_be = i64().write(&i_be, &mut Endianness::BigEndindan).unwrap();
+
+        assert_eq!(i_le, 73_186_801_136_894_465);
+        assert_eq!(i_be, 72_623_859_739_853_825);
         assert_eq!(bytes_le, bytes);
         assert_eq!(bytes_be, bytes);
     }
