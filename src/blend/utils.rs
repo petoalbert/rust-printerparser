@@ -3,6 +3,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs::File;
 use std::io::{Error, Read, Write};
+use tempfile::NamedTempFile;
 
 use crate::printer_parser::printerparser::PrinterParserOps;
 
@@ -12,7 +13,9 @@ pub enum Either<Left, Right> {
     Right(Right),
 }
 
-pub fn to_left<S, A: Clone, B, P: PrinterParserOps<S, A>>(p: P) -> impl PrinterParserOps<S, Either<A, B>> {
+pub fn to_left<S, A: Clone, B, P: PrinterParserOps<S, A>>(
+    p: P,
+) -> impl PrinterParserOps<S, Either<A, B>> {
     p.map_result(
         |result, _| Ok(Either::Left(result)),
         |either, _| match either {
@@ -51,10 +54,15 @@ pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
     Ok(data)
 }
 
-pub fn to_file(path: &str, data: Vec<u8>) -> Result<(), Error> {
-    let file = File::create(path)?;
-    let mut gz = GzEncoder::new(file, Compression::default());
+pub fn to_file_transactional(path: &str, data: Vec<u8>) -> Result<(), Error> {
+    let temp_file = NamedTempFile::new()?;
+
+    let mut gz = GzEncoder::new(&temp_file, Compression::default());
     gz.write_all(&data)?;
+    gz.flush()?;
     gz.finish()?;
+
+    temp_file.persist(path)?;
+
     Ok(())
 }
