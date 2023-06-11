@@ -20,6 +20,9 @@ struct Cli {
     /// path to write to
     #[arg(short, long)]
     to_path: String,
+
+    #[arg(short = 'd', long = "database")]
+    db_path: Option<String>,
 }
 
 fn main() {
