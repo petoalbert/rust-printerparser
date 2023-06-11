@@ -8,7 +8,7 @@ use parserprinter::{
     printer_parser::printerparser::PrinterParser,
 };
 
-use parserprinter::blend::utils::to_file;
+use parserprinter::blend::utils::to_file_transactional;
 
 #[derive(Parser)]
 #[command(about = "The blender version manager tool")]
@@ -39,5 +39,5 @@ fn main() {
         .write(&(header, blocks), &mut parse_state)
         .expect("cannot serialize blender file");
 
-    to_file(&args.to_path, write_back).expect("cannot write to file")
+    to_file_transactional(&args.to_path, write_back).expect("cannot write to file")
 }
