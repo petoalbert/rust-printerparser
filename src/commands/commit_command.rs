@@ -1,3 +1,4 @@
+use flate2::{write::GzEncoder, Compression};
 use rayon::prelude::*;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     printer_parser::printerparser::PrinterParser,
 };
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{time::{SystemTime, UNIX_EPOCH}, io::Write};
 
 use super::utils::hash_list;
 
@@ -34,10 +35,15 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
             let block_blob = block()
                 .write(parsed_block, &mut state)
                 .expect("Cannot write block data");
+
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(&block_blob).expect("Cannot compress block");
+            let compressed = encoder.finish().unwrap();
+
             let hash = md5::compute(&block_blob);
             BlockRecord {
                 hash: format!("{:x}", hash),
-                data: block_blob,
+                data: compressed,
             }
         })
         .collect();
