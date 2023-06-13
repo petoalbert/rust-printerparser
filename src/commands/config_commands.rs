@@ -1,4 +1,4 @@
-use crate::sqlite_ops::sqlite_ops::{open_db, read_config, write_config};
+use crate::db_ops::{open_db, read_config, write_config};
 
 pub fn run_set_name_command(value: String) {
     let conn = open_db("./test.sqlite").expect("Cannot open DB");
