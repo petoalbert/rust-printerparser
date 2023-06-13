@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::utils::hash_list;
 
-pub fn run_commit_command(file_path: &str, db_path: &str) {
+pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
     let blend_bytes = from_file(file_path).expect("cannot unpack blend file");
 
     let blend_hash = md5::compute(&blend_bytes);
@@ -50,7 +50,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str) {
     let commit = Commit {
         hash: format!("{:x}", blend_hash),
         prev_commit_hash: "abcd1234".to_string(),
-        message: "test message".to_string(),
+        message: message.unwrap_or_default(),
         author: "Michelangelo".to_string(),
         date: timestamp(),
         header: header_bytes,

@@ -15,7 +15,7 @@ fn main() {
         Commands::Test { from_path, to_path } => run_command_test(from_path, to_path),
         Commands::SetName { value } => run_set_name_command(value),
         Commands::GetName => run_get_name_command(),
-        Commands::Commit { file_path } => run_commit_command(&file_path, "./test.sqlite"),
+        Commands::Commit { file_path, message} => run_commit_command(&file_path, "./test.sqlite", message),
         Commands::Checkout { file_path, hash } => {
             run_checkout_command(&file_path, "./test.sqlite", &hash)
         }
