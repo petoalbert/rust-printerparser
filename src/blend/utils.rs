@@ -38,7 +38,6 @@ pub fn to_right<S, A, B: Clone, P: PrinterParserOps<S, B>>(
 }
 
 pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
-    println!("{}", path);
     let mut file = File::open(path)?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)?;
