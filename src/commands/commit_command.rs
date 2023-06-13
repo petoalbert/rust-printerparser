@@ -5,14 +5,12 @@ use crate::{
         utils::from_file,
     },
     db_ops::{open_db, write_blocks, write_commit, BlockRecord, Commit},
-    printer_parser::{
-        combinator::{repeat1, separated_list},
-        primitives::char,
-        printerparser::{consume_char, PrinterParser, PrinterParserOps},
-    },
+    printer_parser::printerparser::PrinterParser,
 };
 
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use super::utils::hash_list;
 
 pub fn run_commit_command(file_path: &str, db_path: &str) {
     let blend_bytes = from_file(file_path).expect("cannot unpack blend file");
@@ -67,39 +65,4 @@ fn timestamp() -> u64 {
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_secs()
-}
-
-fn hexa() -> impl PrinterParserOps<(), char> {
-    consume_char.filter(|c| c.is_ascii_hexdigit())
-}
-
-fn hex_string() -> impl PrinterParserOps<(), String> {
-    repeat1(hexa()).map(
-        |cs| -> String { cs.into_iter().collect() },
-        |s| s.chars().collect(),
-    )
-}
-
-fn hash_list() -> impl PrinterParserOps<(), Vec<String>> {
-    separated_list(hex_string(), char(','))
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_hash_list() {
-        let (rest, result) = hash_list().parse("aaa,bbb,111,dead1337", &mut ()).unwrap();
-        assert_eq!(rest, "");
-        assert_eq!(result, vec!["aaa", "bbb", "111", "dead1337"]);
-
-        let vals = vec![
-            "567ab".to_string(),
-            "4893edda".to_string(),
-            "ca849280bcd".to_string(),
-        ];
-        let printed = hash_list().print(&vals, &mut ()).unwrap();
-        assert_eq!(printed, "567ab,4893edda,ca849280bcd")
-    }
 }

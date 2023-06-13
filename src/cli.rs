@@ -31,6 +31,11 @@ pub enum Commands {
     Commit {
         file_path: String,
     },
+
+    Checkout {
+        file_path: String,
+        hash: String,
+    },
 }
 
 pub fn parse_args() -> Cli {
