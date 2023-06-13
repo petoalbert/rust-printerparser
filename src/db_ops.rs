@@ -1,18 +1,18 @@
 type Connection = rusqlite::Connection;
 
 pub struct BlockRecord {
-    hash: String,
-    data: Vec<u8>,
+    pub hash: String,
+    pub data: Vec<u8>,
 }
 
 pub struct Commit {
-    hash: String,
-    prev_commit_hash: String,
-    message: String,
-    author: String,
-    date: u64,
-    header: Vec<u8>,
-    blocks: String,
+    pub hash: String,
+    pub prev_commit_hash: String,
+    pub message: String,
+    pub author: String,
+    pub date: u64,
+    pub header: Vec<u8>,
+    pub blocks: String,
 }
 
 pub fn open_db(path: &str) -> Result<Connection, &'static str> {
@@ -23,14 +23,22 @@ pub fn open_db(path: &str) -> Result<Connection, &'static str> {
         "CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
             value TEXT
-        );
-        
-        CREATE TABLE IF NOT EXISTS block_data (
+        )",
+        [],
+    )
+    .expect("Cannot create config table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS block_data (
             hash TEXT PRIMARY KEY,
             data BLOB
-        );
-        
-        CREATE TABLE IF NOT EXISTS commit (
+        )",
+        [],
+    )
+    .expect("Cannot create block_data table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS commits (
             hash TEXT PRIMARY KEY,
             prev_commit_hash TEXT,
             message TEXT,
@@ -38,10 +46,10 @@ pub fn open_db(path: &str) -> Result<Connection, &'static str> {
             date INTEGER,
             header BLOB,
             blocks TEXT
-        );",
+        )",
         [],
     )
-    .expect("Cannot create DB tables");
+    .expect("Cannot create commits table");
 
     Ok(conn)
 }
@@ -71,9 +79,9 @@ pub fn write_config(conn: &Connection, key: &String, value: &String) -> Result<(
     Ok(())
 }
 
-pub fn write_blocks(conn: &Connection, blocks: Vec<BlockRecord>) -> Result<(), &'static str> {
+pub fn write_blocks(conn: &Connection, blocks: &Vec<BlockRecord>) -> Result<(), &'static str> {
     let mut stmt = conn
-        .prepare("INSERT OR REPLACE INTO block_data (hash, data) VALUES (?1, ?2)")
+        .prepare("INSERT OR IGNORE INTO block_data (hash, data) VALUES (?1, ?2)")
         .expect("Cannot prepare query");
 
     // FIXME: a batching solution should be used here on the long run
@@ -112,7 +120,7 @@ pub fn read_blocks(
 
 pub fn read_commit(conn: &Connection, hash: &str) -> Result<Commit, &'static str> {
     let mut stmt = conn
-        .prepare("SELECT hash, prev_commit_hash, message, author, date, header, blocks FROM commit WHERE hash = ?1")
+        .prepare("SELECT hash, prev_commit_hash, message, author, date, header, blocks FROM commits WHERE hash = ?1")
         .expect("Cannot create query to read config key");
 
     let mut rows = stmt.query([hash]).expect("Cannot query commit");

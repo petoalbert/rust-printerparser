@@ -21,10 +21,16 @@ pub enum Commands {
     },
 
     /// Set username in the DB
-    SetName { value: String },
+    SetName {
+        value: String,
+    },
 
     /// Get username from the DB
     GetName,
+
+    Commit {
+        file_path: String,
+    },
 }
 
 pub fn parse_args() -> Cli {
