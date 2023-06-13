@@ -28,15 +28,24 @@ pub enum Commands {
     /// Get username from the DB
     GetName,
 
+    /// Create a checkpoint with the current contents of the file
     Commit {
         file_path: String,
+
+        /// A short summary of the changes
+        #[arg(short, long)]
+        message: Option<String>,
     },
 
+    /// Write the contents of a checkpoint to a file
     Checkout {
         file_path: String,
+
+        /// The hash of the comit to check out
         hash: String,
     },
 
+    /// List the checkpoints so far
     Log,
 }
 
