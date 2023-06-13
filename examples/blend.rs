@@ -1,42 +1,15 @@
-use clap::{Parser, Subcommand};
 use parserprinter::{
     blend::{
         blend::{Endianness, PointerSize},
         parsers::{blend, BlendFileParseState},
         utils::from_file,
     },
+    cli::{parse_args, Commands},
     printer_parser::printerparser::PrinterParser,
     sqlite_ops::sqlite_ops::{open_db, read_config, write_config},
 };
 
 use parserprinter::blend::utils::to_file_transactional;
-
-#[derive(Parser)]
-#[command(about = "The blender version manager tool")]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Test by reading a file and writing it back into another one
-    Test {
-        /// path of blender file to read
-        #[arg(short, long)]
-        from_path: String,
-
-        /// path to write to
-        #[arg(short, long)]
-        to_path: String,
-    },
-
-    /// Set username in the DB
-    SetName { value: String },
-
-    /// Get username from the DB
-    GetName,
-}
 
 fn run_command_test(from_file_path: String, to_file_path: String) {
     let blend_bytes = from_file(&from_file_path).expect("cannot unpack blend file");
@@ -71,7 +44,7 @@ fn run_get_name_command() {
 }
 
 fn main() {
-    let args = Cli::parse();
+    let args = parse_args();
     match args.command {
         Commands::Test { from_path, to_path } => run_command_test(from_path, to_path),
         Commands::SetName { value } => run_set_name_command(value),
