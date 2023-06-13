@@ -51,7 +51,7 @@ pub struct DnaStruct {
 
 #[derive(Debug)]
 pub struct DnaParseContext {
-    endianness: Endianness,
+    _endianness: Endianness,
     _pointer_size: PointerSize,
 }
 
