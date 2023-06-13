@@ -7,6 +7,7 @@ use crate::blend::blend::{Endianness, Header, PointerSize};
 use super::blend::SimpleParsedBlock;
 use super::utils::{to_left, to_right, Either};
 
+#[derive(Clone)]
 pub struct BlendFileParseState {
     pub pointer_size: PointerSize,
     pub endianness: Endianness,

@@ -9,5 +9,6 @@ edition = "2021"
 clap = { version = "4.3.3", features = ["derive"] }
 flate2 = "1.0"
 md5 = "0.7.0"
+rayon = "1.7.0"
 rusqlite = "0.29.0"
 tempfile = "3.6.0"

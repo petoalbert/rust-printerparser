@@ -1,3 +1,5 @@
+use rayon::prelude::*;
+
 use crate::{
     blend::{
         blend::{Endianness, PointerSize},
@@ -26,10 +28,11 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let (_, (header, blocks)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
 
     let block_data = blocks
-        .iter()
+        .par_iter()
         .map(|parsed_block| {
+            let mut state = parse_state.clone();
             let block_blob = block()
-                .write(parsed_block, &mut parse_state)
+                .write(parsed_block, &mut state)
                 .expect("Cannot write block data");
             let hash = md5::compute(&block_blob);
             BlockRecord {
