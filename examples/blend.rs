@@ -4,6 +4,7 @@ use parserprinter::{
         checkout_command::run_checkout_command,
         commit_command::run_commit_command,
         config_commands::{run_get_name_command, run_set_name_command},
+        log_command::run_log_command,
         test_command::run_command_test,
     },
 };
@@ -18,5 +19,6 @@ fn main() {
         Commands::Checkout { file_path, hash } => {
             run_checkout_command(&file_path, "./test.sqlite", &hash)
         }
+        Commands::Log => run_log_command("./test.sqlite"),
     }
 }

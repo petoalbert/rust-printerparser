@@ -15,6 +15,11 @@ pub struct Commit {
     pub blocks: String,
 }
 
+pub struct ShortCommitRecord {
+    pub hash: String,
+    pub message: String,
+}
+
 pub fn open_db(path: &str) -> Result<Connection, &'static str> {
     let conn =
         Connection::open(path).unwrap_or_else(|_| panic!("cannot connect to db at {}", path));
@@ -155,4 +160,21 @@ pub fn write_commit(conn: &Connection, commit: Commit) -> Result<(), &'static st
     ).expect("Cannot insert commit object");
 
     Ok(())
+}
+
+pub fn read_commits(conn: &Connection) -> Result<Vec<ShortCommitRecord>, &'static str> {
+    let mut stmt = conn
+        .prepare("SELECT hash, message FROM commits ORDER BY date DESC")
+        .expect("Cannot prepare read commits query");
+    let mut rows = stmt.query([]).expect("cannot read commits");
+
+    let mut result: Vec<ShortCommitRecord> = vec![];
+    while let Ok(Some(data)) = rows.next() {
+        result.push(ShortCommitRecord {
+            hash: data.get(0).expect("cannot get hash"),
+            message: data.get(1).expect("cannot read message"),
+        })
+    }
+
+    Ok(result)
 }

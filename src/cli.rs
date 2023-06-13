@@ -36,6 +36,8 @@ pub enum Commands {
         file_path: String,
         hash: String,
     },
+
+    Log,
 }
 
 pub fn parse_args() -> Cli {
