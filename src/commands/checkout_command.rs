@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use flate2::write::DeflateDecoder;
+use flate2::write::{DeflateDecoder, GzDecoder};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -25,7 +25,7 @@ pub fn run_checkout_command(file_path: &str, db_path: &str, hash: &str) {
         .par_iter()
         .map(|record| {
             let mut writer = Vec::new();
-            let mut deflater = DeflateDecoder::new(writer);
+            let mut deflater = GzDecoder::new(writer);
             deflater.write_all(&record.data).unwrap();
             writer = deflater.finish().unwrap();
             writer
