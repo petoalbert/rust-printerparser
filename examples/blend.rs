@@ -13,12 +13,18 @@ fn main() {
     let args = parse_args();
     match args.command {
         Commands::Test { from_path, to_path } => run_command_test(from_path, to_path),
-        Commands::SetName { value } => run_set_name_command(value),
-        Commands::GetName => run_get_name_command(),
-        Commands::Commit { file_path, message} => run_commit_command(&file_path, "./test.sqlite", message),
-        Commands::Checkout { file_path, hash } => {
-            run_checkout_command(&file_path, "./test.sqlite", &hash)
-        }
-        Commands::Log => run_log_command("./test.sqlite"),
+        Commands::SetName { value, db_path } => run_set_name_command(db_path, value),
+        Commands::GetName { db_path } => run_get_name_command(db_path),
+        Commands::Commit {
+            db_path,
+            file_path,
+            message,
+        } => run_commit_command(&file_path, &db_path, message),
+        Commands::Checkout {
+            db_path,
+            file_path,
+            hash,
+        } => run_checkout_command(&file_path, &db_path, &hash),
+        Commands::Log { db_path } => run_log_command(&db_path),
     }
 }

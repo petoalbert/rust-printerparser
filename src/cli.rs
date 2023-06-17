@@ -22,14 +22,29 @@ pub enum Commands {
 
     /// Set username in the DB
     SetName {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Desired value for `name`
         value: String,
     },
 
     /// Get username from the DB
-    GetName,
+    GetName {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+    },
 
     /// Create a checkpoint with the current contents of the file
     Commit {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Path to the blender file to create the commit from
+        #[arg(short, long)]
         file_path: String,
 
         /// A short summary of the changes
@@ -39,14 +54,25 @@ pub enum Commands {
 
     /// Write the contents of a checkpoint to a file
     Checkout {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Path of the file to write to
+        #[arg(short, long)]
         file_path: String,
 
         /// The hash of the comit to check out
+        #[arg(long)]
         hash: String,
     },
 
     /// List the checkpoints so far
-    Log,
+    Log {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+    },
 }
 
 pub fn parse_args() -> Cli {

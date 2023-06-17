@@ -1,11 +1,11 @@
 use std::io::Write;
 
-use flate2::write::{DeflateDecoder, GzDecoder};
+use flate2::write::{GzDecoder};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     blend::utils::to_file_transactional,
-    db_ops::{open_db, read_blocks, read_commit, BlockRecord},
+    db_ops::{open_db, read_blocks, read_commit},
     printer_parser::printerparser::PrinterParser,
 };
 
