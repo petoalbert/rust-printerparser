@@ -7,7 +7,7 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    db_ops::{open_db, write_blocks, write_commit, BlockRecord, Commit},
+    db_ops::{BlockRecord, Commit, SqliteDB, DB},
     printer_parser::printerparser::PrinterParser,
 };
 
@@ -42,7 +42,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     println!("Hashing blocks {:?}...", file_path);
     let start_hash_blocks = Instant::now();
-    let block_data = blocks
+    let block_data: Vec<BlockRecord> = blocks
         .par_iter()
         .map(|parsed_block| {
             let mut state = parse_state.clone();
@@ -67,11 +67,12 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_blocks = start_hash_blocks.elapsed();
     println!("Took {:?}", duration_hash_blocks);
 
-    let conn = open_db(db_path).expect("cannot open DB");
+    let conn = SqliteDB::open(db_path).expect("cannot open DB");
 
     println!("Writing blocks {:?}...", file_path);
     let start_write_blocks = Instant::now();
-    write_blocks(&conn, &block_data).expect("Cannot write blocks");
+    conn.write_blocks(&block_data[..])
+        .expect("Cannot write blocks");
     let duration_write_blocks = start_write_blocks.elapsed();
     println!("Took {:?}", duration_write_blocks);
 
@@ -95,7 +96,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         blocks: blocks_str,
     };
 
-    write_commit(&conn, commit).expect("cannot write commit")
+    conn.write_commit(commit).expect("cannot write commit")
 }
 
 fn timestamp() -> u64 {
