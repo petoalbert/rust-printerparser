@@ -2,8 +2,9 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs::File;
-use std::io::{Error, Read, Write};
+use std::io::{Cursor, Error, Read, Write};
 use tempfile::NamedTempFile;
+use zstd::decode_all;
 
 use crate::printer_parser::printerparser::PrinterParserOps;
 
@@ -37,17 +38,30 @@ pub fn to_right<S, A, B: Clone, P: PrinterParserOps<S, B>>(
     )
 }
 
+fn decode_gzip(bytes: &Vec<u8>) -> Result<Vec<u8>, Error> {
+    let mut decoder = GzDecoder::new(&bytes[..]);
+    let mut gzip_data = Vec::new();
+    decoder.read_to_end(&mut gzip_data)?;
+
+    Ok(gzip_data)
+}
+
+fn decode_zstd(bytes: &Vec<u8>) -> Result<Vec<u8>, Error> {
+    let mut reader = Cursor::new(bytes);
+    decode_all(&mut reader)
+}
+
 pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
     let mut file = File::open(path)?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)?;
 
     if data[0..7] != *b"BLENDER" {
-        let mut decoder = GzDecoder::new(&data[..]);
-        let mut gzip_data = Vec::new();
-        decoder.read_to_end(&mut gzip_data)?;
+        let unzipped = decode_gzip(&data)
+            .or(decode_zstd(&data))
+            .expect("Cannot unzip blend file");
 
-        data = gzip_data;
+        data = unzipped;
     }
 
     Ok(data)
