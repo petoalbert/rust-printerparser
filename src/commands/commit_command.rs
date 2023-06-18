@@ -7,7 +7,7 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    db_ops::{BlockRecord, Commit, SqliteDB, DB},
+    db_ops::{BlockRecord, Commit, RocksDB, SqliteDB, DB},
     printer_parser::printerparser::PrinterParser,
 };
 
@@ -67,7 +67,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_blocks = start_hash_blocks.elapsed();
     println!("Took {:?}", duration_hash_blocks);
 
-    let conn = SqliteDB::open(db_path).expect("cannot open DB");
+    let conn = RocksDB::open(db_path).expect("cannot open DB");
 
     println!("Writing blocks {:?}...", file_path);
     let start_write_blocks = Instant::now();

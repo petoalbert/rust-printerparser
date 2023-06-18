@@ -118,8 +118,8 @@ impl DB for SqliteDB {
             .expect("Cannot prepare query");
 
         let mut cnt = 0;
-        // FIXME: a batching solution should be used here on the long run
         let mut start_parse = Instant::now();
+        // FIXME: a batching solution should be used here on the long run
         for block in blocks {
             stmt.execute((&block.hash, &block.data))
                 .expect("Cannot insert block");
@@ -240,14 +240,33 @@ impl DB for RocksDB {
     }
 
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
-        todo!()
-    }
+        let mut cnt = 0;
+        let mut start_parse = Instant::now();
+        for block in blocks {
+            self.conn
+                .put(format!("config-{:?}", block.hash), &block.data)
+                .expect("Cannot write block");
+            cnt += 1;
+            if cnt % 100 == 0 {
+                println!(
+                    "Inserting 100 blocks took {:?} - {:?}/{:?}",
+                    start_parse.elapsed(),
+                    cnt,
+                    blocks.len()
+                );
+                start_parse = Instant::now()
+            }
+        }
 
-    fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError> {
-        todo!()
+        Ok(())
     }
 
     fn write_commit(&self, commit: Commit) -> Result<(), DBError> {
+        // TODO
+        Ok(())
+    }
+
+    fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError> {
         todo!()
     }
 
