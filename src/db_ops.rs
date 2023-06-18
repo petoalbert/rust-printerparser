@@ -215,3 +215,47 @@ impl DB for SqliteDB {
         Ok(result)
     }
 }
+
+pub struct RocksDB {
+    conn: rocksdb::DB,
+}
+
+impl DB for RocksDB {
+    fn open(path: &str) -> Result<Self, DBError> {
+        let db = rocksdb::DB::open_default(path).expect("Cannot open DB");
+        Ok(Self { conn: db })
+    }
+
+    fn read_config(&self, key: &str) -> Result<Option<String>, DBError> {
+        self.conn
+            .get(format!("config-{:?}", key))
+            .map_err(|_| DBError("zzz".to_string()))
+            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))
+    }
+
+    fn write_config(&self, key: &str, value: &str) -> Result<(), DBError> {
+        self.conn
+            .put(format!("config-{:?}", key), value)
+            .map_err(|_| DBError("zzz".to_string()))
+    }
+
+    fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
+        todo!()
+    }
+
+    fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError> {
+        todo!()
+    }
+
+    fn write_commit(&self, commit: Commit) -> Result<(), DBError> {
+        todo!()
+    }
+
+    fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError> {
+        todo!()
+    }
+
+    fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError> {
+        todo!()
+    }
+}
