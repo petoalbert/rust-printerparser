@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 type Connection = rusqlite::Connection;
 
 pub struct BlockRecord {
@@ -89,10 +91,22 @@ pub fn write_blocks(conn: &Connection, blocks: &Vec<BlockRecord>) -> Result<(), 
         .prepare("INSERT OR IGNORE INTO block_data (hash, data) VALUES (?1, ?2)")
         .expect("Cannot prepare query");
 
+    let mut cnt = 0;
     // FIXME: a batching solution should be used here on the long run
+    let mut start_parse = Instant::now();
     for block in blocks {
         stmt.execute((&block.hash, &block.data))
             .expect("Cannot insert block");
+        cnt += 1;
+        if cnt % 100 == 0 {
+            println!(
+                "Inserting 100 blocks took {:?} - {:?}/{:?}",
+                start_parse.elapsed(),
+                cnt,
+                blocks.len()
+            );
+            start_parse = Instant::now()
+        }
     }
 
     Ok(())

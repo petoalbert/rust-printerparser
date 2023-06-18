@@ -13,15 +13,18 @@ use crate::{
 
 use std::{
     io::Write,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use super::utils::hash_list;
 
 pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
+    println!("Reading {:?}...", file_path);
+    let start = Instant::now();
     let blend_bytes = from_file(file_path).expect("cannot unpack blend file");
+    let duration_read_file = start.elapsed();
 
-    let blend_hash = md5::compute(&blend_bytes);
+    println!("Took {:?}", duration_read_file);
 
     let mut parse_state = BlendFileParseState {
         pointer_size: PointerSize::Bits32,
@@ -29,8 +32,16 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         current_block_size: 0,
     };
 
+    println!("Parsing blocks {:?}...", file_path);
+    let start_parse = Instant::now();
     let (_, (header, blocks)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
+    let duration_parse = start_parse.elapsed();
+    println!("Took {:?}", duration_parse);
 
+    println!("Number of blocks: {:?}", blocks.len());
+
+    println!("Hashing blocks {:?}...", file_path);
+    let start_hash_blocks = Instant::now();
     let block_data = blocks
         .par_iter()
         .map(|parsed_block| {
@@ -53,14 +64,26 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
             }
         })
         .collect();
+    let duration_hash_blocks = start_hash_blocks.elapsed();
+    println!("Took {:?}", duration_hash_blocks);
 
     let conn = open_db(db_path).expect("cannot open DB");
 
+    println!("Writing blocks {:?}...", file_path);
+    let start_write_blocks = Instant::now();
     write_blocks(&conn, &block_data).expect("Cannot write blocks");
+    let duration_write_blocks = start_write_blocks.elapsed();
+    println!("Took {:?}", duration_write_blocks);
 
     let header_bytes = pheader().write(&header, &mut parse_state).unwrap();
     let block_hashes: Vec<String> = block_data.iter().map(|b| b.hash.clone()).collect();
     let blocks_str = hash_list().print(&block_hashes, &mut ()).unwrap();
+
+    println!("Hashing {:?}...", file_path);
+    let start_hash = Instant::now();
+    let blend_hash = md5::compute(&blocks_str);
+    let duration_hash_file = start_hash.elapsed();
+    println!("Took {:?}", duration_hash_file);
 
     let commit = Commit {
         hash: format!("{:x}", blend_hash),
