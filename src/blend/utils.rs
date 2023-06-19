@@ -38,8 +38,8 @@ pub fn to_right<S, A, B: Clone, P: PrinterParserOps<S, B>>(
     )
 }
 
-fn decode_gzip(bytes: &Vec<u8>) -> Result<Vec<u8>, Error> {
-    let mut decoder = GzDecoder::new(&bytes[..]);
+fn decode_gzip(bytes: &[u8]) -> Result<Vec<u8>, Error> {
+    let mut decoder = GzDecoder::new(bytes);
     let mut gzip_data = Vec::new();
     decoder.read_to_end(&mut gzip_data)?;
 

@@ -7,7 +7,7 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    db_ops::{open_db, write_blocks, write_commit, BlockRecord, Commit},
+    db_ops::{BlockRecord, Commit, Persistence, DB},
     printer_parser::printerparser::PrinterParser,
 };
 
@@ -19,6 +19,7 @@ use std::{
 use super::utils::hash_list;
 
 pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
+    let start_commit_command = Instant::now();
     println!("Reading {:?}...", file_path);
     let start = Instant::now();
     let blend_bytes = from_file(file_path).expect("cannot unpack blend file");
@@ -42,7 +43,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     println!("Hashing blocks {:?}...", file_path);
     let start_hash_blocks = Instant::now();
-    let block_data = blocks
+    let block_data: Vec<BlockRecord> = blocks
         .par_iter()
         .map(|parsed_block| {
             let mut state = parse_state.clone();
@@ -67,16 +68,17 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_blocks = start_hash_blocks.elapsed();
     println!("Took {:?}", duration_hash_blocks);
 
-    let conn = open_db(db_path).expect("cannot open DB");
+    let conn = Persistence::open(db_path).expect("cannot open DB");
 
     println!("Writing blocks {:?}...", file_path);
     let start_write_blocks = Instant::now();
-    write_blocks(&conn, &block_data).expect("Cannot write blocks");
+    conn.write_blocks(&block_data[..])
+        .expect("Cannot write blocks");
     let duration_write_blocks = start_write_blocks.elapsed();
     println!("Took {:?}", duration_write_blocks);
 
     let header_bytes = pheader().write(&header, &mut parse_state).unwrap();
-    let block_hashes: Vec<String> = block_data.iter().map(|b| b.hash.clone()).collect();
+    let block_hashes: Vec<String> = block_data.iter().map(move |b| b.hash.to_owned()).collect();
     let blocks_str = hash_list().print(&block_hashes, &mut ()).unwrap();
 
     println!("Hashing {:?}...", file_path);
@@ -95,7 +97,8 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         blocks: blocks_str,
     };
 
-    write_commit(&conn, commit).expect("cannot write commit")
+    conn.write_commit(commit).expect("cannot write commit");
+    println!("Committing took {:?}", start_commit_command.elapsed());
 }
 
 fn timestamp() -> u64 {

@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::path::Path;
 
 type Connection = rusqlite::Connection;
 
@@ -22,173 +22,174 @@ pub struct ShortCommitRecord {
     pub message: String,
 }
 
-pub fn open_db(path: &str) -> Result<Connection, &'static str> {
-    let conn =
-        Connection::open(path).unwrap_or_else(|_| panic!("cannot connect to db at {}", path));
+#[derive(Debug)]
+pub struct DBError(String);
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )",
-        [],
-    )
-    .expect("Cannot create config table");
+pub trait DB: Sized {
+    fn open(path: &str) -> Result<Self, DBError>;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS block_data (
-            hash TEXT PRIMARY KEY,
-            data BLOB
-        )",
-        [],
-    )
-    .expect("Cannot create block_data table");
+    fn read_config(&self, key: &str) -> Result<Option<String>, DBError>;
+    fn write_config(&self, key: &str, value: &str) -> Result<(), DBError>;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS commits (
-            hash TEXT PRIMARY KEY,
-            prev_commit_hash TEXT,
-            message TEXT,
-            author TEXT,
-            date INTEGER,
-            header BLOB,
-            blocks TEXT
-        )",
-        [],
-    )
-    .expect("Cannot create commits table");
+    fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError>;
+    fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError>;
 
-    Ok(conn)
+    fn write_commit(&self, commit: Commit) -> Result<(), DBError>;
+    fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
+
+    fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
 }
 
-pub fn read_config(conn: &Connection, key: &str) -> Result<Option<String>, &'static str> {
-    let mut stmt = conn
-        .prepare("SELECT value FROM config WHERE key = ?1")
-        .expect("Cannot create query to read config key");
-
-    let mut rows = stmt
-        .query(&[key])
-        .expect("Cannot run query to read config key");
-
-    if let Ok(Some(row)) = rows.next() {
-        Ok(Some(row.get(0).unwrap()))
-    } else {
-        Ok(None)
-    }
+pub struct Persistence {
+    rocks_db: rocksdb::DB,
+    sqlite_db: rusqlite::Connection,
 }
 
-pub fn write_config(conn: &Connection, key: &String, value: &String) -> Result<(), &'static str> {
-    conn.execute(
-        "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
-        [key, value],
-    )
-    .expect("Cannot update config key");
-    Ok(())
+#[inline]
+fn config_key(key: &str) -> String {
+    format!("config-{:?}", key)
 }
 
-pub fn write_blocks(conn: &Connection, blocks: &Vec<BlockRecord>) -> Result<(), &'static str> {
-    let mut stmt = conn
-        .prepare("INSERT OR IGNORE INTO block_data (hash, data) VALUES (?1, ?2)")
-        .expect("Cannot prepare query");
-
-    let mut cnt = 0;
-    // FIXME: a batching solution should be used here on the long run
-    let mut start_parse = Instant::now();
-    for block in blocks {
-        stmt.execute((&block.hash, &block.data))
-            .expect("Cannot insert block");
-        cnt += 1;
-        if cnt % 100 == 0 {
-            println!(
-                "Inserting 100 blocks took {:?} - {:?}/{:?}",
-                start_parse.elapsed(),
-                cnt,
-                blocks.len()
-            );
-            start_parse = Instant::now()
-        }
-    }
-
-    Ok(())
+#[inline]
+fn block_hash_key(key: &str) -> String {
+    format!("block-hash-{:?}", key)
 }
 
-pub fn read_blocks(
-    conn: &Connection,
-    hashes: Vec<String>,
-) -> Result<Vec<BlockRecord>, &'static str> {
-    let mut stmt = conn
-        .prepare("SELECT hash, data FROM block_data WHERE hash = ?1")
-        .expect("Cannot prepare statement");
-
-    let mut result = Vec::new();
-
-    // FIXME: a batching solution should be used here on the long run
-    for get_hash in hashes {
-        let mut rows = stmt.query([get_hash]).expect("Cannot query block");
-
-        if let Some(row) = rows.next().unwrap() {
-            result.push(BlockRecord {
-                hash: row.get(0).expect("Cannot read hash value"),
-                data: row.get(1).expect("Cannot read block data"),
-            })
-        }
-    }
-
-    Ok(result)
+#[inline]
+fn working_dir_key(key: &str) -> String {
+    format!("working-dir-{:?}", key)
 }
 
-pub fn read_commit(conn: &Connection, hash: &str) -> Result<Commit, &'static str> {
-    let mut stmt = conn
-        .prepare("SELECT hash, prev_commit_hash, message, author, date, header, blocks FROM commits WHERE hash = ?1")
-        .expect("Cannot create query to read config key");
+impl DB for Persistence {
+    fn open(path: &str) -> Result<Self, DBError> {
+        let sqlite_path = Path::new(path).join("commits.sqlite");
+        let rocks_path = Path::new(path).join("blobs.rocks");
 
-    let mut rows = stmt.query([hash]).expect("Cannot query commit");
-    let row = rows
-        .next()
-        .expect("No rows returned")
-        .expect("No data in row");
+        let rocks_db = rocksdb::DB::open_default(rocks_path).expect("Cannot open rocksdb");
+        let sqlite_db = Connection::open(sqlite_path).expect("Cannot open sqlite db");
 
-    Ok(Commit {
-        hash: row.get(0).expect("No hash found in row"),
-        prev_commit_hash: row.get(1).expect("No prev_commit_hash found in row"),
-        message: row.get(2).expect("No message found in row"),
-        author: row.get(3).expect("No author found in row"),
-        date: row.get(4).expect("No date found in row"),
-        header: row.get(5).expect("No header found in row"),
-        blocks: row.get(6).expect("No blocks found in row"),
-    })
-}
+        sqlite_db
+            .execute(
+                "CREATE TABLE IF NOT EXISTS commits (
+                    hash TEXT PRIMARY KEY,
+                    prev_commit_hash TEXT,
+                    message TEXT,
+                    author TEXT,
+                    date INTEGER,
+                    header BLOB
+                )",
+                [],
+            )
+            .expect("Cannot create commits table");
 
-pub fn write_commit(conn: &Connection, commit: Commit) -> Result<(), &'static str> {
-    conn.execute(
-        "INSERT INTO commits (hash, prev_commit_hash, message, author, date, header, blocks) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        (
-            commit.hash,
-            commit.prev_commit_hash,
-            commit.message,
-            commit.author,
-            commit.date,
-            commit.header,
-            commit.blocks,
-        ),
-    ).expect("Cannot insert commit object");
-
-    Ok(())
-}
-
-pub fn read_commits(conn: &Connection) -> Result<Vec<ShortCommitRecord>, &'static str> {
-    let mut stmt = conn
-        .prepare("SELECT hash, message FROM commits ORDER BY date DESC")
-        .expect("Cannot prepare read commits query");
-    let mut rows = stmt.query([]).expect("cannot read commits");
-
-    let mut result: Vec<ShortCommitRecord> = vec![];
-    while let Ok(Some(data)) = rows.next() {
-        result.push(ShortCommitRecord {
-            hash: data.get(0).expect("cannot get hash"),
-            message: data.get(1).expect("cannot read message"),
+        Ok(Self {
+            rocks_db,
+            sqlite_db,
         })
     }
 
-    Ok(result)
+    fn read_config(&self, key: &str) -> Result<Option<String>, DBError> {
+        self.rocks_db
+            .get(config_key(key))
+            .map_err(|_| DBError(format!("Cannot get value for {:?}", key)))
+            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))
+    }
+
+    fn write_config(&self, key: &str, value: &str) -> Result<(), DBError> {
+        self.rocks_db
+            .put(config_key(key), value)
+            .map_err(|_| DBError(format!("Cannot get value for {:?}", key)))
+    }
+
+    fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
+        for block in blocks {
+            self.rocks_db
+                .put(block_hash_key(&block.hash), &block.data)
+                .expect("Cannot write block");
+        }
+
+        Ok(())
+    }
+
+    fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError> {
+        let mut result: Vec<BlockRecord> = Vec::new();
+        for hash in hashes {
+            let block_data = self
+                .rocks_db
+                .get(block_hash_key(&hash))
+                .expect("Error reading block")
+                .expect("No block with hash found");
+            result.push(BlockRecord {
+                hash,
+                data: block_data,
+            })
+        }
+
+        Ok(result)
+    }
+
+    fn write_commit(&self, commit: Commit) -> Result<(), DBError> {
+        self.rocks_db
+            .put(working_dir_key(&commit.hash), commit.blocks)
+            .expect("Cannot write working dir blocks");
+
+        self.sqlite_db.execute(
+            "INSERT INTO commits (hash, prev_commit_hash, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            (
+                commit.hash,
+                commit.prev_commit_hash,
+                commit.message,
+                commit.author,
+                commit.date,
+                commit.header,
+            ),
+        ).expect("Cannot insert commit object");
+
+        Ok(())
+    }
+
+    fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError> {
+        let blocks = self
+            .rocks_db
+            .get(working_dir_key(hash))
+            .expect("Cannot read working dir key")
+            .map(|bs| String::from_utf8(bs).unwrap())
+            .expect("No working dir found");
+
+        let mut stmt = self.sqlite_db
+        .prepare("SELECT hash, prev_commit_hash, message, author, date, header FROM commits WHERE hash = ?1")
+        .expect("Cannot create query to read config key");
+
+        let mut rows = stmt.query([hash]).expect("Cannot query commit");
+        let row = rows.next().expect("No rows returned").expect("No data"); // TODO: chained
+
+        Ok(Some(Commit {
+            hash: row.get(0).expect("No hash found in row"),
+            prev_commit_hash: row.get(1).expect("No prev_commit_hash found in row"),
+            message: row.get(2).expect("No message found in row"),
+            author: row.get(3).expect("No author found in row"),
+            date: row.get(4).expect("No date found in row"),
+            header: row.get(5).expect("No header found in row"),
+            blocks,
+        }))
+    }
+
+    fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare("SELECT hash, message FROM commits ORDER BY date DESC")
+            .expect("Cannot prepare read commits query");
+
+        let mut rows = stmt.query([]).expect("cannot read commits");
+
+        let mut result: Vec<ShortCommitRecord> = vec![];
+        while let Ok(Some(data)) = rows.next() {
+            result.push(ShortCommitRecord {
+                hash: data.get(0).expect("cannot get hash"),
+                message: data.get(1).expect("cannot read message"),
+            })
+        }
+
+        Ok(result)
+    }
 }
