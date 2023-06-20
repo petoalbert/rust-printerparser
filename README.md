@@ -1,6 +1,6 @@
 ## TODO
-- [*] parsing / printing blender files using the same schema description
-- [*] simple commit and checkout operations
+- [x] parsing / printing blender files using the same schema description
+- [x] simple commit and checkout operations
 - [ ] streaming parsing / printing
 - [ ] combinator that fails of the rest of the input is not empty (`complete` in nom?)
 - [ ] create lib.rs for the parser/printer stuff, and move json to an examples file
