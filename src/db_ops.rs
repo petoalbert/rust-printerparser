@@ -39,6 +39,7 @@ pub trait DB: Sized {
     fn write_commit(&self, commit: Commit) -> Result<(), DBError>;
     fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
 
+    fn read_commits_for_branch(&self, brach_name: &str) -> Result<Vec<ShortCommitRecord>, DBError>;
     fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
 
     fn read_current_branch_name(&self) -> Result<String, DBError>;
@@ -202,6 +203,28 @@ impl DB for Persistence {
             .expect("Cannot prepare read commits query");
 
         let mut rows = stmt.query([]).expect("cannot read commits");
+
+        let mut result: Vec<ShortCommitRecord> = vec![];
+        while let Ok(Some(data)) = rows.next() {
+            result.push(ShortCommitRecord {
+                hash: data.get(0).expect("cannot get hash"),
+                branch: data.get(1).expect("cannot get branch"),
+                message: data.get(2).expect("cannot read message"),
+            })
+        }
+
+        Ok(result)
+    }
+
+    fn read_commits_for_branch(&self, brach_name: &str) -> Result<Vec<ShortCommitRecord>, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare(
+                "SELECT hash, branch, message FROM commits WHERE branch = ?1 ORDER BY date DESC",
+            )
+            .expect("Cannot prepare read commits query");
+
+        let mut rows = stmt.query([brach_name]).expect("cannot read commits");
 
         let mut result: Vec<ShortCommitRecord> = vec![];
         while let Ok(Some(data)) = rows.next() {

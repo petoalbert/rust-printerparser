@@ -67,13 +67,6 @@ pub enum Commands {
         hash: String,
     },
 
-    /// List the checkpoints so far
-    Log {
-        /// Path to the blend file DB
-        #[arg(short, long)]
-        db_path: String,
-    },
-
     /// Create a new branch
     NewBranch {
         /// Path to the blend file DB
@@ -105,6 +98,17 @@ pub enum Commands {
         /// Path of the file to write to
         #[arg(short, long)]
         file_path: String,
+    },
+
+    /// Log all checkpoints for the current branch or a specified branch
+    LogCheckpoints {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Optional: name of the branch to log checkpoints for
+        #[arg(short, long)]
+        branch: Option<String>,
     },
 }
 

@@ -4,7 +4,7 @@ use parserprinter::{
         commit_command::run_commit_command,
         config_commands::{run_get_name_command, run_set_name_command},
         list_branches_command::run_list_branches,
-        log_command::run_log_command,
+        log_checkpoints_command::run_log_checkpoints_command,
         new_branch_command::run_new_branch_command,
         restore_command::run_restore_command,
         switch_command::run_switch_command,
@@ -28,7 +28,6 @@ fn main() {
             file_path,
             hash,
         } => run_restore_command(&file_path, &db_path, &hash),
-        Commands::Log { db_path } => run_log_command(&db_path),
         Commands::NewBranch {
             db_path,
             branch_name,
@@ -39,5 +38,8 @@ fn main() {
             branch,
             file_path,
         } => run_switch_command(&db_path, &branch, &file_path),
+        Commands::LogCheckpoints { db_path, branch } => {
+            run_log_checkpoints_command(&db_path, branch)
+        }
     }
 }
