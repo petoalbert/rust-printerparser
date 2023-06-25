@@ -5,6 +5,7 @@ use parserprinter::{
         commit_command::run_commit_command,
         config_commands::{run_get_name_command, run_set_name_command},
         log_command::run_log_command,
+        new_branch_command::run_new_branch_command,
         test_command::run_command_test,
     },
 };
@@ -26,5 +27,9 @@ fn main() {
             hash,
         } => run_checkout_command(&file_path, &db_path, &hash),
         Commands::Log { db_path } => run_log_command(&db_path),
+        Commands::NewBranch {
+            db_path,
+            branch_name,
+        } => run_new_branch_command(&db_path, branch_name),
     }
 }

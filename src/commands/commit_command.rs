@@ -87,11 +87,26 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_file = start_hash.elapsed();
     println!("Took {:?}", duration_hash_file);
 
+    let name = conn
+        .read_config("name")
+        .expect("Cannot read name")
+        .unwrap_or("Anon".to_owned());
+
+    let prev_commit = conn
+        .read_config("HEAD")
+        .expect("Cannot read HEAD")
+        .unwrap_or_default();
+
+    let commit_hash = format!("{:x}", blend_hash);
+
+    conn.write_config("HEAD", &commit_hash)
+        .expect("Cannot write commit hash");
+
     let commit = Commit {
-        hash: format!("{:x}", blend_hash),
-        prev_commit_hash: "abcd1234".to_string(),
+        hash: commit_hash,
+        prev_commit_hash: prev_commit,
         message: message.unwrap_or_default(),
-        author: "Michelangelo".to_string(),
+        author: name,
         date: timestamp(),
         header: header_bytes,
         blocks: blocks_str,

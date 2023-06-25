@@ -73,6 +73,17 @@ pub enum Commands {
         #[arg(short, long)]
         db_path: String,
     },
+
+    /// Create a new branch
+    NewBranch {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// The name of the new branch
+        #[arg(short, long)]
+        branch_name: String
+    },
 }
 
 pub fn parse_args() -> Cli {
