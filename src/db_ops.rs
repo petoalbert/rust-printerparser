@@ -40,11 +40,11 @@ pub trait DB: Sized {
     fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
 
     fn read_current_branch_name(&self) -> Result<String, DBError>;
-    fn write_current_branch_name(&self, brach_name: String) -> Result<(), DBError>;
+    fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError>;
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
 
-    fn read_branch_tip(&self, branch_name: String) -> Result<String, DBError>;
+    fn read_branch_tip(&self, branch_name: &str) -> Result<String, DBError>;
     fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError>;
 }
 
@@ -224,7 +224,7 @@ impl DB for Persistence {
             .ok_or(DBError("Current branch name not set".to_owned()))
     }
 
-    fn write_current_branch_name(&self, brach_name: String) -> Result<(), DBError> {
+    fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError> {
         self.rocks_db
             .put(current_branch_name_key(), brach_name)
             .map_err(|_| DBError("Cannot write branch name".to_owned()))
@@ -248,7 +248,7 @@ impl DB for Persistence {
         Ok(result)
     }
 
-    fn read_branch_tip(&self, branch_name: String) -> Result<String, DBError> {
+    fn read_branch_tip(&self, branch_name: &str) -> Result<String, DBError> {
         self.sqlite_db
             .query_row(
                 "SELECT tip FROM branches WHERE name = ?1",

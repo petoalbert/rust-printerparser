@@ -91,6 +91,21 @@ pub enum Commands {
         #[arg(short, long)]
         db_path: String,
     },
+
+    /// Switch to the latest version on a branch
+    Switch {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Name of the branch to switch to
+        #[arg(short, long)]
+        branch: String,
+
+        /// Path of the file to write to
+        #[arg(short, long)]
+        file_path: String,
+    },
 }
 
 pub fn parse_args() -> Cli {

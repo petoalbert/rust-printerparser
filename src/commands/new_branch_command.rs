@@ -10,11 +10,11 @@ pub fn run_new_branch_command(db_path: &str, branch_name: String) {
     }
 
     let tip = db
-        .read_branch_tip(current_brach_name)
+        .read_branch_tip(&current_brach_name)
         .expect("Cannot read current branch tip");
 
     db.write_branch_tip(&branch_name, &tip)
         .expect("Cannot create new branch");
-    db.write_current_branch_name(branch_name)
+    db.write_current_branch_name(&branch_name)
         .expect("Cannot set current branch name")
 }

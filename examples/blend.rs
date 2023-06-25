@@ -7,6 +7,7 @@ use parserprinter::{
         log_command::run_log_command,
         new_branch_command::run_new_branch_command,
         restore_command::run_restore_command,
+        switch_command::run_switch_command,
         test_command::run_command_test,
     },
 };
@@ -33,5 +34,10 @@ fn main() {
             branch_name,
         } => run_new_branch_command(&db_path, branch_name),
         Commands::ListBranches { db_path } => run_list_branches(&db_path),
+        Commands::Switch {
+            db_path,
+            branch,
+            file_path,
+        } => run_switch_command(&db_path, &branch, &file_path),
     }
 }
