@@ -17,6 +17,7 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
     println!("Reading commit {:?}", hash);
     let read_checkpoint = Instant::now();
     let conn = Persistence::open(db_path).expect("Cannot open DB");
+
     let commit = conn
         .read_commit(hash)
         .expect("cannot read commit")
@@ -64,5 +65,11 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
 
     to_file_transactional(file_path, header).expect("Cannot write to file");
     println!("Writing file took: {:?}", blocks_checkpoint.elapsed());
-    println!("Checkout took: {:?}", start.elapsed())
+    println!("Checkout took: {:?}", start.elapsed());
+
+    conn.write_current_branch_name(&commit.branch)
+        .expect("Cannot write current branch");
+
+    conn.write_current_latest_commit(&commit.hash)
+        .expect("Cannot set latest commit");
 }

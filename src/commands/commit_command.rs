@@ -7,6 +7,9 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
+    commands::invariants::{
+        check_current_branch_current_commit_set, check_no_detached_head_invariant,
+    },
     db_ops::{BlockRecord, Commit, Persistence, DB},
     printer_parser::printerparser::PrinterParser,
 };
@@ -19,6 +22,11 @@ use std::{
 use super::utils::hash_list;
 
 pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
+    let conn = Persistence::open(db_path).expect("cannot open DB");
+
+    check_current_branch_current_commit_set(&conn);
+    check_no_detached_head_invariant(&conn);
+
     let start_commit_command = Instant::now();
     println!("Reading {:?}...", file_path);
     let start = Instant::now();
@@ -67,8 +75,6 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         .collect();
     let duration_hash_blocks = start_hash_blocks.elapsed();
     println!("Took {:?}", duration_hash_blocks);
-
-    let conn = Persistence::open(db_path).expect("cannot open DB");
 
     println!("Writing blocks {:?}...", file_path);
     let start_write_blocks = Instant::now();

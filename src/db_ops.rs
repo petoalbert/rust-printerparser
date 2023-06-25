@@ -45,6 +45,9 @@ pub trait DB: Sized {
     fn read_current_branch_name(&self) -> Result<String, DBError>;
     fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError>;
 
+    fn read_current_latest_commit(&self) -> Result<String, DBError>;
+    fn write_current_latest_commit(&self, hash: &str) -> Result<(), DBError>;
+
     fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
 
     fn read_branch_tip(&self, branch_name: &str) -> Result<String, DBError>;
@@ -74,6 +77,11 @@ fn working_dir_key(key: &str) -> String {
 #[inline]
 fn current_branch_name_key() -> String {
     "CURRENT_BRANCH_NAME".to_string()
+}
+
+#[inline]
+fn current_latest_commit_key() -> String {
+    "CURRENT_LATEST_COMMIT".to_string()
 }
 
 impl DB for Persistence {
@@ -239,7 +247,7 @@ impl DB for Persistence {
     }
 
     fn read_current_branch_name(&self) -> Result<String, DBError> {
-        self.rocks_db // TODO: this could actually be stored in sqlite in `key` but it doesn't really matter
+        self.rocks_db
             .get(current_branch_name_key())
             .map_err(|_| DBError("Cannot read current branch name".to_owned()))
             .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))?
@@ -293,5 +301,19 @@ impl DB for Persistence {
                 ))
             })
             .map(|_| ())
+    }
+
+    fn read_current_latest_commit(&self) -> Result<String, DBError> {
+        self.rocks_db
+            .get(current_latest_commit_key())
+            .map_err(|_| DBError("Cannot read latest commit hash".to_owned()))
+            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))?
+            .ok_or(DBError("Latest commit hash not set".to_owned()))
+    }
+
+    fn write_current_latest_commit(&self, hash: &str) -> Result<(), DBError> {
+        self.rocks_db
+            .put(current_latest_commit_key(), hash)
+            .map_err(|e| DBError(format!("Cannot get latest commit hash: {:?}", e)))
     }
 }

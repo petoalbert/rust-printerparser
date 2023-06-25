@@ -8,3 +8,4 @@ pub mod switch_command;
 pub mod test_command;
 
 mod utils;
+mod invariants;
