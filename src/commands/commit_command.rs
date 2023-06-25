@@ -92,19 +92,23 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         .expect("Cannot read name")
         .unwrap_or("Anon".to_owned());
 
-    let prev_commit = conn
-        .read_config("HEAD")
-        .expect("Cannot read HEAD")
-        .unwrap_or_default();
+    let current_brach_name = conn
+        .read_current_branch_name()
+        .expect("Cannot read current branch name");
+
+    let tip = conn
+        .read_branch_tip(&current_brach_name)
+        .expect("Cannot read current branch tip");
 
     let commit_hash = format!("{:x}", blend_hash);
 
-    conn.write_config("HEAD", &commit_hash)
+    conn.write_branch_tip(&commit_hash, &commit_hash)
         .expect("Cannot write commit hash");
 
     let commit = Commit {
         hash: commit_hash,
-        prev_commit_hash: prev_commit,
+        prev_commit_hash: tip,
+        branch: current_brach_name,
         message: message.unwrap_or_default(),
         author: name,
         date: timestamp(),

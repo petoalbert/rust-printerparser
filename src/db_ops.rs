@@ -10,6 +10,7 @@ pub struct BlockRecord {
 pub struct Commit {
     pub hash: String,
     pub prev_commit_hash: String,
+    pub branch: String,
     pub message: String,
     pub author: String,
     pub date: u64,
@@ -19,6 +20,7 @@ pub struct Commit {
 
 pub struct ShortCommitRecord {
     pub hash: String,
+    pub branch: String,
     pub message: String,
 }
 
@@ -86,6 +88,7 @@ impl DB for Persistence {
                 "CREATE TABLE IF NOT EXISTS commits (
                     hash TEXT PRIMARY KEY,
                     prev_commit_hash TEXT,
+                    branch TEXT,
                     message TEXT,
                     author TEXT,
                     date INTEGER,
@@ -103,7 +106,7 @@ impl DB for Persistence {
                 )",
                 [],
             )
-            .expect("Cannot create commits table");
+            .expect("Cannot create branches table");
 
         Ok(Self {
             rocks_db,
@@ -157,10 +160,11 @@ impl DB for Persistence {
             .expect("Cannot write working dir blocks");
 
         self.sqlite_db.execute(
-            "INSERT INTO commits (hash, prev_commit_hash, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO commits (hash, prev_commit_hash, branch, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             (
                 commit.hash,
                 commit.prev_commit_hash,
+                commit.branch,
                 commit.message,
                 commit.author,
                 commit.date,
@@ -179,28 +183,22 @@ impl DB for Persistence {
             .map(|bs| String::from_utf8(bs).unwrap())
             .expect("No working dir found");
 
-        let mut stmt = self.sqlite_db
-        .prepare("SELECT hash, prev_commit_hash, message, author, date, header FROM commits WHERE hash = ?1")
-        .expect("Cannot create query to read config key");
-
-        let mut rows = stmt.query([hash]).expect("Cannot query commit");
-        let row = rows.next().expect("No rows returned").expect("No data"); // TODO: chained
-
-        Ok(Some(Commit {
+        self.sqlite_db.query_row("SELECT hash, prev_commit_hash, message, author, date, header FROM commits WHERE hash = ?1", [hash], |row| Ok(Some(Commit {
             hash: row.get(0).expect("No hash found in row"),
             prev_commit_hash: row.get(1).expect("No prev_commit_hash found in row"),
-            message: row.get(2).expect("No message found in row"),
-            author: row.get(3).expect("No author found in row"),
-            date: row.get(4).expect("No date found in row"),
-            header: row.get(5).expect("No header found in row"),
+            branch: row.get(2).expect("No branch found in row"),
+            message: row.get(3).expect("No message found in row"),
+            author: row.get(4).expect("No author found in row"),
+            date: row.get(5).expect("No date found in row"),
+            header: row.get(6).expect("No header found in row"),
             blocks,
-        }))
+        }))).map_err(|e| DBError(format!("Cannot read commit: {:?}", e)))
     }
 
     fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError> {
         let mut stmt = self
             .sqlite_db
-            .prepare("SELECT hash, message FROM commits ORDER BY date DESC")
+            .prepare("SELECT hash, branch, message FROM commits ORDER BY date DESC")
             .expect("Cannot prepare read commits query");
 
         let mut rows = stmt.query([]).expect("cannot read commits");
@@ -209,7 +207,8 @@ impl DB for Persistence {
         while let Ok(Some(data)) = rows.next() {
             result.push(ShortCommitRecord {
                 hash: data.get(0).expect("cannot get hash"),
-                message: data.get(1).expect("cannot read message"),
+                branch: data.get(1).expect("cannot get branch"),
+                message: data.get(2).expect("cannot read message"),
             })
         }
 
