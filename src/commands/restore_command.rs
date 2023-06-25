@@ -11,7 +11,7 @@ use crate::{
 
 use super::utils::hash_list;
 
-pub fn run_checkout_command(file_path: &str, db_path: &str, hash: &str) {
+pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
     let start = Instant::now();
 
     println!("Reading commit {:?}", hash);

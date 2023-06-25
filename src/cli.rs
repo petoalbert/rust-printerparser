@@ -53,7 +53,7 @@ pub enum Commands {
     },
 
     /// Write the contents of a checkpoint to a file
-    Checkout {
+    Restore {
         /// Path to the blend file DB
         #[arg(short, long)]
         db_path: String,
