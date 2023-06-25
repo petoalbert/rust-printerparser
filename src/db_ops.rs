@@ -38,6 +38,14 @@ pub trait DB: Sized {
     fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
 
     fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
+
+    fn read_current_branch_name(&self) -> Result<String, DBError>;
+    fn write_current_branch_name(&self, brach_name: String) -> Result<(), DBError>;
+
+    fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
+
+    fn read_branch_tip(&self, branch_name: String) -> Result<String, DBError>;
+    fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError>;
 }
 
 pub struct Persistence {
@@ -60,6 +68,11 @@ fn working_dir_key(key: &str) -> String {
     format!("working-dir-{:?}", key)
 }
 
+#[inline]
+fn current_branch_name_key() -> String {
+    "CURRENT_BRANCH_NAME".to_string()
+}
+
 impl DB for Persistence {
     fn open(path: &str) -> Result<Self, DBError> {
         let sqlite_path = Path::new(path).join("commits.sqlite");
@@ -77,6 +90,16 @@ impl DB for Persistence {
                     author TEXT,
                     date INTEGER,
                     header BLOB
+                )",
+                [],
+            )
+            .expect("Cannot create commits table");
+
+        sqlite_db
+            .execute(
+                "CREATE TABLE IF NOT EXISTS branches (
+                    name TEXT PRIMARY KEY,
+                    tip TEXT
                 )",
                 [],
             )
@@ -191,5 +214,62 @@ impl DB for Persistence {
         }
 
         Ok(result)
+    }
+
+    fn read_current_branch_name(&self) -> Result<String, DBError> {
+        self.rocks_db // TODO: this could actually be stored in sqlite in `key` but it doesn't really matter
+            .get(current_branch_name_key())
+            .map_err(|_| DBError("Cannot read current branch name".to_owned()))
+            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))?
+            .ok_or(DBError("Current branch name not set".to_owned()))
+    }
+
+    fn write_current_branch_name(&self, brach_name: String) -> Result<(), DBError> {
+        self.rocks_db
+            .put(current_branch_name_key(), brach_name)
+            .map_err(|_| DBError("Cannot write branch name".to_owned()))
+    }
+
+    fn read_all_branches(&self) -> Result<Vec<String>, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare("SELECT branch FROM branches")
+            .map_err(|e| DBError(format!("Cannot query branches: {:?}", e)))?;
+        let mut rows = stmt
+            .query([])
+            .map_err(|e| DBError(format!("Cannot query branches: {:?}", e)))?;
+
+        let mut result: Vec<String> = vec![];
+
+        while let Ok(Some(data)) = rows.next() {
+            result.push(data.get(0).expect("cannot get branch name"))
+        }
+
+        Ok(result)
+    }
+
+    fn read_branch_tip(&self, branch_name: String) -> Result<String, DBError> {
+        self.sqlite_db
+            .query_row(
+                "SELECT tip FROM branches WHERE name = ?1",
+                [branch_name],
+                |row| row.get(0),
+            )
+            .map_err(|e| DBError(format!("Cannot get branch tip: {:?}", e)))
+    }
+
+    fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError> {
+        self.sqlite_db
+            .execute(
+                "INSERT INTO branches (name, tip) VALUES (?1, ?2)",
+                [&brach_name, &tip],
+            )
+            .map_err(|e| {
+                DBError(format!(
+                    "Cannot create new branch {:?}: {:?}",
+                    brach_name, e
+                ))
+            })
+            .map(|_| ())
     }
 }
