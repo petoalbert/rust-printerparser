@@ -82,7 +82,14 @@ pub enum Commands {
 
         /// The name of the new branch
         #[arg(short, long)]
-        branch_name: String
+        branch_name: String,
+    },
+
+    /// Lists all existing branches
+    ListBranches {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
     },
 }
 

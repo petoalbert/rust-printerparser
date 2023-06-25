@@ -4,6 +4,7 @@ use parserprinter::{
         checkout_command::run_checkout_command,
         commit_command::run_commit_command,
         config_commands::{run_get_name_command, run_set_name_command},
+        list_branches_command::run_list_branches,
         log_command::run_log_command,
         new_branch_command::run_new_branch_command,
         test_command::run_command_test,
@@ -31,5 +32,6 @@ fn main() {
             db_path,
             branch_name,
         } => run_new_branch_command(&db_path, branch_name),
+        Commands::ListBranches { db_path } => run_list_branches(&db_path),
     }
 }
