@@ -7,6 +7,9 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
+    commands::invariants::{
+        check_current_branch_current_commit_set, check_no_detached_head_invariant,
+    },
     db_ops::{BlockRecord, Commit, Persistence, DB},
     printer_parser::printerparser::PrinterParser,
 };
@@ -19,6 +22,11 @@ use std::{
 use super::utils::hash_list;
 
 pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
+    let conn = Persistence::open(db_path).expect("cannot open DB");
+
+    check_current_branch_current_commit_set(&conn);
+    check_no_detached_head_invariant(&conn);
+
     let start_commit_command = Instant::now();
     println!("Reading {:?}...", file_path);
     let start = Instant::now();
@@ -68,8 +76,6 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_blocks = start_hash_blocks.elapsed();
     println!("Took {:?}", duration_hash_blocks);
 
-    let conn = Persistence::open(db_path).expect("cannot open DB");
-
     println!("Writing blocks {:?}...", file_path);
     let start_write_blocks = Instant::now();
     conn.write_blocks(&block_data[..])
@@ -87,11 +93,30 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     let duration_hash_file = start_hash.elapsed();
     println!("Took {:?}", duration_hash_file);
 
+    let name = conn
+        .read_config("name")
+        .expect("Cannot read name")
+        .unwrap_or("Anon".to_owned());
+
+    let current_brach_name = conn
+        .read_current_branch_name()
+        .expect("Cannot read current branch name");
+
+    let tip = conn
+        .read_branch_tip(&current_brach_name)
+        .expect("Cannot read current branch tip");
+
+    let commit_hash = format!("{:x}", blend_hash);
+
+    conn.write_branch_tip(&commit_hash, &commit_hash)
+        .expect("Cannot write commit hash");
+
     let commit = Commit {
-        hash: format!("{:x}", blend_hash),
-        prev_commit_hash: "abcd1234".to_string(),
+        hash: commit_hash,
+        prev_commit_hash: tip,
+        branch: current_brach_name,
         message: message.unwrap_or_default(),
-        author: "Michelangelo".to_string(),
+        author: name,
         date: timestamp(),
         header: header_bytes,
         blocks: blocks_str,

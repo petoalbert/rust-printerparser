@@ -53,7 +53,7 @@ pub enum Commands {
     },
 
     /// Write the contents of a checkpoint to a file
-    Checkout {
+    Restore {
         /// Path to the blend file DB
         #[arg(short, long)]
         db_path: String,
@@ -67,11 +67,48 @@ pub enum Commands {
         hash: String,
     },
 
-    /// List the checkpoints so far
-    Log {
+    /// Create a new branch
+    NewBranch {
         /// Path to the blend file DB
         #[arg(short, long)]
         db_path: String,
+
+        /// The name of the new branch
+        #[arg(short, long)]
+        branch_name: String,
+    },
+
+    /// Lists all existing branches
+    ListBranches {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+    },
+
+    /// Switch to the latest version on a branch
+    Switch {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Name of the branch to switch to
+        #[arg(short, long)]
+        branch: String,
+
+        /// Path of the file to write to
+        #[arg(short, long)]
+        file_path: String,
+    },
+
+    /// Log all checkpoints for the current branch or a specified branch
+    LogCheckpoints {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Optional: name of the branch to log checkpoints for
+        #[arg(short, long)]
+        branch: Option<String>,
     },
 }
 
