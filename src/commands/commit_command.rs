@@ -11,6 +11,7 @@ use crate::{
         check_current_branch_current_commit_set, check_no_detached_head_invariant,
     },
     db_ops::{BlockRecord, Commit, Persistence, DB},
+    measure_time,
     printer_parser::printerparser::PrinterParser,
 };
 
@@ -28,12 +29,9 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     check_no_detached_head_invariant(&conn);
 
     let start_commit_command = Instant::now();
-    println!("Reading {:?}...", file_path);
-    let start = Instant::now();
-    let blend_bytes = from_file(file_path).expect("cannot unpack blend file");
-    let duration_read_file = start.elapsed();
-
-    println!("Took {:?}", duration_read_file);
+    let blend_bytes = measure_time!(format!("Reading {:?}", file_path), {
+        from_file(file_path).expect("cannot unpack blend file")
+    });
 
     let mut parse_state = BlendFileParseState {
         pointer_size: PointerSize::Bits32,
@@ -41,57 +39,53 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         current_block_size: 0,
     };
 
-    println!("Parsing blocks {:?}...", file_path);
-    let start_parse = Instant::now();
-    let (_, (header, blocks)) = blend().read(&blend_bytes, &mut parse_state).unwrap();
-    let duration_parse = start_parse.elapsed();
-    println!("Took {:?}", duration_parse);
+    let (_, (header, blocks)) = measure_time!(format!("Parsing blocks {:?}", file_path), {
+        blend().read(&blend_bytes, &mut parse_state).unwrap()
+    });
 
     println!("Number of blocks: {:?}", blocks.len());
 
-    println!("Hashing blocks {:?}...", file_path);
-    let start_hash_blocks = Instant::now();
-    let block_data: Vec<BlockRecord> = blocks
-        .par_iter()
-        .map(|parsed_block| {
-            let mut state = parse_state.clone();
-            let block_blob = block()
-                .write(parsed_block, &mut state)
-                .expect("Cannot write block data");
+    let block_data: Vec<BlockRecord> = measure_time!(format!("Hashing blocks {:?}", file_path), {
+        blocks
+            .par_iter()
+            .map(|parsed_block| {
+                let mut state = parse_state.clone();
+                let block_blob = block()
+                    .write(parsed_block, &mut state)
+                    .expect("Cannot write block data");
 
-            let hash = md5::compute(&block_blob);
+                let hash = md5::compute(&block_blob);
 
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder
-                .write_all(&block_blob)
-                .expect("Cannot compress block");
-            let compressed = encoder.finish().unwrap();
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+                encoder
+                    .write_all(&block_blob)
+                    .expect("Cannot compress block");
+                let compressed = encoder.finish().unwrap();
 
-            BlockRecord {
-                hash: format!("{:x}", hash),
-                data: compressed,
-            }
-        })
-        .collect();
-    let duration_hash_blocks = start_hash_blocks.elapsed();
-    println!("Took {:?}", duration_hash_blocks);
+                BlockRecord {
+                    hash: format!("{:x}", hash),
+                    data: compressed,
+                }
+            })
+            .collect()
+    });
 
-    println!("Writing blocks {:?}...", file_path);
-    let start_write_blocks = Instant::now();
-    conn.write_blocks(&block_data[..])
-        .expect("Cannot write blocks");
-    let duration_write_blocks = start_write_blocks.elapsed();
-    println!("Took {:?}", duration_write_blocks);
+    measure_time!(format!("Writing blocks {:?}", file_path), {
+        conn.write_blocks(&block_data[..])
+            .expect("Cannot write blocks")
+    });
 
     let header_bytes = pheader().write(&header, &mut parse_state).unwrap();
-    let block_hashes: Vec<String> = block_data.iter().map(move |b| b.hash.to_owned()).collect();
-    let blocks_str = hash_list().print(&block_hashes, &mut ()).unwrap();
+    let block_hashes: Vec<String> = measure_time!("Collecting block hashes", {
+        block_data.iter().map(move |b| b.hash.to_owned()).collect()
+    });
+    let blocks_str = measure_time!("Printing hash list", {
+        hash_list().print(&block_hashes, &mut ()).unwrap()
+    });
 
-    println!("Hashing {:?}...", file_path);
-    let start_hash = Instant::now();
-    let blend_hash = md5::compute(&blocks_str);
-    let duration_hash_file = start_hash.elapsed();
-    println!("Took {:?}", duration_hash_file);
+    let blend_hash = measure_time!(format!("Hashing {:?}", file_path), {
+        md5::compute(&blocks_str)
+    });
 
     let name = conn
         .read_config("name")
@@ -132,3 +126,17 @@ fn timestamp() -> u64 {
         .expect("Time went backwards")
         .as_secs()
 }
+
+// #[cfg(test)]
+// mod test {
+//     use std::fs;
+
+//     #[test]
+//     fn test_test() {
+//         let paths = fs::read_dir("./").unwrap();
+
+//         for path in paths {
+//             println!("Name: {}", path.unwrap().path().display())
+//         }
+//     }
+// }

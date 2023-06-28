@@ -192,7 +192,7 @@ impl DB for Persistence {
             .map(|bs| String::from_utf8(bs).unwrap())
             .expect("No working dir found");
 
-        self.sqlite_db.query_row("SELECT hash, prev_commit_hash, message, author, date, header FROM commits WHERE hash = ?1", [hash], |row| Ok(Some(Commit {
+        self.sqlite_db.query_row("SELECT hash, prev_commit_hash, branch, message, author, date, header FROM commits WHERE hash = ?1", [hash], |row| Ok(Some(Commit {
             hash: row.get(0).expect("No hash found in row"),
             prev_commit_hash: row.get(1).expect("No prev_commit_hash found in row"),
             branch: row.get(2).expect("No branch found in row"),
