@@ -263,7 +263,7 @@ impl DB for Persistence {
     fn read_all_branches(&self) -> Result<Vec<String>, DBError> {
         let mut stmt = self
             .sqlite_db
-            .prepare("SELECT branch FROM branches")
+            .prepare("SELECT name FROM branches")
             .map_err(|e| DBError(format!("Cannot query branches: {:?}", e)))?;
         let mut rows = stmt
             .query([])
