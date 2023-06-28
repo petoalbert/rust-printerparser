@@ -64,3 +64,52 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
 
     println!("Checkout took: {:?}", end_to_end_timer.elapsed());
 }
+
+#[cfg(test)]
+mod test {
+    use tempfile::{NamedTempFile, TempDir};
+
+    use crate::{commands::test_utils, db_ops::{Persistence, DB}};
+
+    use super::run_restore_command;
+
+    #[test]
+    fn test_restore() {
+        let tmp_dir = TempDir::new().expect("Cannot create temp dir");
+        let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
+
+        test_utils::init_db(tmp_db_path);
+
+        test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
+        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
+
+        let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
+
+        run_restore_command(
+            tmp_blend_path.path().to_str().unwrap(),
+            tmp_db_path,
+            "a5f92d0a988085ed66c9dcdccc7b9c90",
+        );
+
+        let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
+
+        // Number of commits stays the same
+        assert_eq!(db.read_all_commits().unwrap().len(), 2);
+
+        let current_branch_name = db.read_current_branch_name().expect("Cannot read current branch name");
+
+        // The current branch name stays the same
+        assert_eq!(current_branch_name, "main");
+
+        let latest_commit_hash = db
+            .read_current_latest_commit()
+            .expect("Cannot read latest commit");
+
+        // The latest commit hash is updated to the hash of the restored commit
+        assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
+
+        // The tip of `main` stays the same
+        let main_tip = db.read_branch_tip("main").unwrap();
+        assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
+    }
+}
