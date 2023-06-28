@@ -109,7 +109,7 @@ mod test {
         assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
         // The tip of `main` stays the same
-        let main_tip = db.read_branch_tip("main").unwrap();
+        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
         assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
     }
 }

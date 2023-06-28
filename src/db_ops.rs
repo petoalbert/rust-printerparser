@@ -50,7 +50,7 @@ pub trait DB: Sized {
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
 
-    fn read_branch_tip(&self, branch_name: &str) -> Result<String, DBError>;
+    fn read_branch_tip(&self, branch_name: &str) -> Result<Option<String>, DBError>;
     fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError>;
 }
 
@@ -278,14 +278,25 @@ impl DB for Persistence {
         Ok(result)
     }
 
-    fn read_branch_tip(&self, branch_name: &str) -> Result<String, DBError> {
-        self.sqlite_db
-            .query_row(
-                "SELECT tip FROM branches WHERE name = ?1",
-                [branch_name],
-                |row| row.get(0),
-            )
-            .map_err(|e| DBError(format!("Cannot get branch tip: {:?}", e)))
+    fn read_branch_tip(&self, branch_name: &str) -> Result<Option<String>, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare("SELECT tip FROM branches WHERE name = ?1")
+            .map_err(|e| DBError(format!("Cannot query branch: {:?}", e)))?;
+
+        let mut rows = stmt
+            .query([branch_name])
+            .map_err(|e| DBError(format!("Cannot query branch: {:?}", e)))?;
+
+        let row = rows.next();
+
+        if let Ok(Some(data)) = row {
+            Ok(Some(data.get(0).unwrap()))
+        } else if let Ok(None) = row {
+            Ok(None)
+        } else {
+            Err(DBError("Cannot query branch".to_owned()))
+        }
     }
 
     fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError> {

@@ -33,19 +33,22 @@ pub fn run_new_branch_command(db_path: &str, new_branch_name: String) {
 mod test {
     use tempfile::TempDir;
 
-    use crate::{commands::test_utils, db_ops::{Persistence, DB}};
+    use crate::{
+        commands::test_utils,
+        db_ops::{Persistence, DB},
+    };
 
     use super::run_new_branch_command;
 
     #[test]
-    fn test_new_branch() {
+    fn test_create_new_branch() {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
         test_utils::init_db(tmp_db_path);
-        
+
         run_new_branch_command(tmp_db_path, "dev".to_owned());
-         
+
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
 
@@ -55,7 +58,7 @@ mod test {
 
         let branches = db.read_all_branches().unwrap();
         assert_eq!(branches, vec!["dev", "main"]);
-        
+
         // the current branch name is updated to the name of the new branch
         assert_eq!(current_branch_name, "dev");
 
@@ -65,5 +68,33 @@ mod test {
 
         // the latest commit hash stays the same
         assert_eq!(latest_commit_name, "initial");
+    }
+
+    #[test]
+    fn test_commit_to_new_branch() {
+        let tmp_dir = TempDir::new().expect("Cannot create temp dir");
+        let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
+
+        test_utils::init_db(tmp_db_path);
+
+        // a commit to `main`
+        test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
+
+        run_new_branch_command(tmp_db_path, "dev".to_owned());
+
+        // a commit to `other`
+        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
+
+        let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
+
+        let commits = db.read_all_commits().unwrap();
+
+        assert_eq!(commits.len(), 2);
+
+        // latest commit first
+        assert_eq!(commits.get(0).unwrap().branch, "main");
+        assert_eq!(commits.get(0).unwrap().message, "Commit");
+        assert_eq!(commits.get(1).unwrap().branch, "dev");
+        assert_eq!(commits.get(1).unwrap().message, "Commit 2");
     }
 }

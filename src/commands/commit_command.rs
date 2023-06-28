@@ -98,7 +98,8 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     let tip = conn
         .read_branch_tip(&current_brach_name)
-        .expect("Cannot read current branch tip");
+        .expect("Cannot read current branch tip")
+        .expect("Tip not found for branch");
 
     let commit_hash = format!("{:x}", blend_hash);
 
@@ -184,7 +185,7 @@ mod test {
         assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
         // The tip of `main` is updated to the hash of the new commit
-        let main_tip = db.read_branch_tip("main").unwrap();
+        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
         assert_eq!(main_tip, "a5f92d0a988085ed66c9dcdccc7b9c90");
     }
 
@@ -221,7 +222,7 @@ mod test {
         assert_eq!(latest_commit_hash, "b637ec695e10bed0ce06279d1dc46717");
 
         // The tip of `main` is updated to the hash of the new commit
-        let main_tip = db.read_branch_tip("main").unwrap();
+        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
         assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
     }
 }
