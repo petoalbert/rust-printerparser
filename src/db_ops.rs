@@ -291,7 +291,7 @@ impl DB for Persistence {
     fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError> {
         self.sqlite_db
             .execute(
-                "INSERT INTO branches (name, tip) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO branches (name, tip) VALUES (?1, ?2)",
                 [&brach_name, &tip],
             )
             .map_err(|e| {

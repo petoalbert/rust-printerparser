@@ -102,8 +102,11 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     let commit_hash = format!("{:x}", blend_hash);
 
-    conn.write_branch_tip(&commit_hash, &commit_hash)
+    conn.write_branch_tip(&current_brach_name, &commit_hash)
         .expect("Cannot write commit hash");
+
+    conn.write_current_latest_commit(&commit_hash)
+        .expect("Cannot write latest commit");
 
     let commit = Commit {
         hash: commit_hash,
@@ -127,16 +130,98 @@ fn timestamp() -> u64 {
         .as_secs()
 }
 
-// #[cfg(test)]
-// mod test {
-//     use std::fs;
+#[cfg(test)]
+mod test {
+    use tempfile::TempDir;
 
-//     #[test]
-//     fn test_test() {
-//         let paths = fs::read_dir("./").unwrap();
+    use crate::{
+        commands::test_utils,
+        db_ops::{Persistence, DB},
+    };
 
-//         for path in paths {
-//             println!("Name: {}", path.unwrap().path().display())
-//         }
-//     }
-// }
+    use super::run_commit_command;
+
+    #[test]
+    fn test_initial_commit() {
+        let tmp_dir = TempDir::new().expect("Cannot create temp dir");
+        let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
+
+        test_utils::init_db(tmp_path);
+
+        run_commit_command("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+
+        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
+
+        // Creates exactly one commit
+        assert_eq!(db.read_all_commits().unwrap().len(), 1);
+
+        let commit = db
+            .read_commit("a5f92d0a988085ed66c9dcdccc7b9c90")
+            .unwrap()
+            .unwrap();
+
+        // commit.blocks omitted, too long
+        // commit.date omitted, not stable
+        // commit.header omitted, not interesting enough
+        assert_eq!(commit.author, "Anon");
+        assert_eq!(commit.branch, "main");
+        assert_eq!(commit.hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
+        assert_eq!(commit.message, "Message");
+        assert_eq!(commit.prev_commit_hash, "initial");
+
+        let current_branch_name = db
+            .read_current_branch_name()
+            .expect("Cannot read current branch name");
+
+        // The current branch name stays the same
+        assert_eq!(current_branch_name, "main");
+
+        let latest_commit_hash = db
+            .read_current_latest_commit()
+            .expect("Cannot read latest commit");
+
+        // The latest commit hash is updated to the hash of the new commit
+        assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
+
+        // The tip of `main` is updated to the hash of the new commit
+        let main_tip = db.read_branch_tip("main").unwrap();
+        assert_eq!(main_tip, "a5f92d0a988085ed66c9dcdccc7b9c90");
+    }
+
+    #[test]
+    fn test_next_commit() {
+        let tmp_dir = TempDir::new().expect("Cannot create temp dir");
+        let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
+
+        test_utils::init_db(tmp_path);
+
+        run_commit_command("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+        run_commit_command(
+            "data/untitled_2.blend",
+            tmp_path,
+            Some("Message".to_owned()),
+        );
+
+        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
+
+        assert_eq!(db.read_all_commits().unwrap().len(), 2);
+
+        let current_branch_name = db
+            .read_current_branch_name()
+            .expect("Cannot read current branch name");
+
+        // The current branch name stays the same
+        assert_eq!(current_branch_name, "main");
+
+        let latest_commit_hash = db
+            .read_current_latest_commit()
+            .expect("Cannot read latest commit");
+
+        // The latest commit hash is updated to the hash of the new commit
+        assert_eq!(latest_commit_hash, "b637ec695e10bed0ce06279d1dc46717");
+
+        // The tip of `main` is updated to the hash of the new commit
+        let main_tip = db.read_branch_tip("main").unwrap();
+        assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
+    }
+}
