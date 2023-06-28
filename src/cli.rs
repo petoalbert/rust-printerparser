@@ -110,6 +110,13 @@ pub enum Commands {
         #[arg(short, long)]
         branch: Option<String>,
     },
+
+    /// Initialize the DB
+    Init {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+    },
 }
 
 pub fn parse_args() -> Cli {

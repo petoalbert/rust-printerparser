@@ -3,6 +3,7 @@ use parserprinter::{
     commands::{
         commit_command::run_commit_command,
         config_commands::{run_get_name_command, run_set_name_command},
+        init_command::run_init_command,
         list_branches_command::run_list_branches,
         log_checkpoints_command::run_log_checkpoints_command,
         new_branch_command::run_new_branch_command,
@@ -41,5 +42,6 @@ fn main() {
         Commands::LogCheckpoints { db_path, branch } => {
             run_log_checkpoints_command(&db_path, branch)
         }
+        Commands::Init { db_path } => run_init_command(&db_path),
     }
 }
