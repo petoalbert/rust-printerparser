@@ -1,16 +1,17 @@
-use parserprinter::{
-    cli::{parse_args, Commands},
-    commands::{
-        commit_command::run_commit_command,
-        config_commands::{run_get_name_command, run_set_name_command},
-        init_command::run_init_command,
-        list_branches_command::run_list_branches,
-        log_checkpoints_command::run_log_checkpoints_command,
-        new_branch_command::run_new_branch_command,
-        restore_command::run_restore_command,
-        switch_command::run_switch_command,
-        test_command::run_command_test,
-    },
+mod cli;
+
+use cli::{parse_args, Commands};
+
+use parserprinter::commands::{
+    commit_command::run_commit_command,
+    config_commands::{run_get_name_command, run_set_name_command},
+    init_command::run_init_command,
+    list_branches_command::run_list_branches,
+    log_checkpoints_command::run_log_checkpoints_command,
+    new_branch_command::run_new_branch_command,
+    restore_command::run_restore_command,
+    switch_command::run_switch_command,
+    test_command::run_command_test,
 };
 
 fn main() {
