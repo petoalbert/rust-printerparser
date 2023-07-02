@@ -91,6 +91,14 @@ mod test {
 
         assert_eq!(commits.len(), 2);
 
+        assert_eq!(
+            commits
+                .iter()
+                .map(|c| c.message.clone())
+                .collect::<Vec<String>>(),
+            vec!["Commit", "Commit 2"]
+        );
+
         // latest commit first
         assert_eq!(commits.get(0).unwrap().branch, "main");
         assert_eq!(commits.get(0).unwrap().message, "Commit");
