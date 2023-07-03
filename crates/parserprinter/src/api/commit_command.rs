@@ -7,7 +7,7 @@ use crate::{
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    commands::invariants::{
+    api::invariants::{
         check_current_branch_current_commit_set, check_no_detached_head_invariant,
     },
     db_ops::{BlockRecord, Commit, Persistence, DB},
@@ -136,7 +136,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        commands::test_utils,
+        api::test_utils,
         db_ops::{Persistence, DB},
     };
 

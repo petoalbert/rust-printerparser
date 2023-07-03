@@ -69,7 +69,7 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
 mod test {
     use tempfile::{NamedTempFile, TempDir};
 
-    use crate::{commands::test_utils, db_ops::{Persistence, DB}};
+    use crate::{api::test_utils, db_ops::{Persistence, DB}};
 
     use super::run_restore_command;
 

@@ -34,7 +34,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        commands::test_utils,
+        api::test_utils,
         db_ops::{Persistence, DB},
     };
 

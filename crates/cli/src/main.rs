@@ -2,7 +2,7 @@ mod cli;
 
 use cli::{parse_args, Commands};
 
-use parserprinter::commands::{
+use parserprinter::api::{
     commit_command::run_commit_command,
     config_commands::{run_get_name_command, run_set_name_command},
     init_command::run_init_command,
