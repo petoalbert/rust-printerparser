@@ -2,15 +2,13 @@ use flate2::{write::GzEncoder, Compression};
 use rayon::prelude::*;
 
 use crate::{
+    api::invariants::{check_current_branch_current_commit_set, check_no_detached_head_invariant},
     blend::{
         blend::{Endianness, PointerSize},
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    api::invariants::{
-        check_current_branch_current_commit_set, check_no_detached_head_invariant,
-    },
-    db_ops::{BlockRecord, Commit, Persistence, DB},
+    db_ops::{BlockRecord, Commit, DBError, Persistence, DB},
     measure_time,
     printer_parser::printerparser::PrinterParser,
 };
@@ -22,7 +20,11 @@ use std::{
 
 use super::utils::hash_list;
 
-pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String>) {
+pub fn create_new_commit(
+    file_path: &str,
+    db_path: &str,
+    message: Option<String>,
+) -> Result<(), DBError> {
     let conn = Persistence::open(db_path).expect("cannot open DB");
 
     check_current_branch_current_commit_set(&conn);
@@ -30,8 +32,8 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     let start_commit_command = Instant::now();
     let blend_bytes = measure_time!(format!("Reading {:?}", file_path), {
-        from_file(file_path).expect("cannot unpack blend file")
-    });
+        from_file(file_path).map_err(|_| DBError("cannot unpack blend file".to_owned()))
+    })?;
 
     let mut parse_state = BlendFileParseState {
         pointer_size: PointerSize::Bits32,
@@ -71,8 +73,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
     });
 
     measure_time!(format!("Writing blocks {:?}", file_path), {
-        conn.write_blocks(&block_data[..])
-            .expect("Cannot write blocks")
+        conn.write_blocks(&block_data[..])?
     });
 
     let header_bytes = pheader().write(&header, &mut parse_state).unwrap();
@@ -87,27 +88,19 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
         md5::compute(&blocks_str)
     });
 
-    let name = conn
-        .read_config("name")
-        .expect("Cannot read name")
-        .unwrap_or("Anon".to_owned());
+    let name = conn.read_config("name")?.unwrap_or("Anon".to_owned());
 
-    let current_brach_name = conn
-        .read_current_branch_name()
-        .expect("Cannot read current branch name");
+    let current_brach_name = conn.read_current_branch_name()?;
 
     let tip = conn
-        .read_branch_tip(&current_brach_name)
-        .expect("Cannot read current branch tip")
-        .expect("Tip not found for branch");
+        .read_branch_tip(&current_brach_name)?
+        .ok_or(DBError("Tip not found for branch".to_owned()))?;
 
     let commit_hash = format!("{:x}", blend_hash);
 
-    conn.write_branch_tip(&current_brach_name, &commit_hash)
-        .expect("Cannot write commit hash");
+    conn.write_branch_tip(&current_brach_name, &commit_hash)?;
 
-    conn.write_current_latest_commit(&commit_hash)
-        .expect("Cannot write latest commit");
+    conn.write_current_latest_commit(&commit_hash)?;
 
     let commit = Commit {
         hash: commit_hash,
@@ -122,6 +115,7 @@ pub fn run_commit_command(file_path: &str, db_path: &str, message: Option<String
 
     conn.write_commit(commit).expect("cannot write commit");
     println!("Committing took {:?}", start_commit_command.elapsed());
+    Ok(())
 }
 
 fn timestamp() -> u64 {
@@ -140,7 +134,7 @@ mod test {
         db_ops::{Persistence, DB},
     };
 
-    use super::run_commit_command;
+    use super::create_new_commit;
 
     #[test]
     fn test_initial_commit() {
@@ -149,7 +143,7 @@ mod test {
 
         test_utils::init_db(tmp_path);
 
-        run_commit_command("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned()));
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
@@ -196,8 +190,8 @@ mod test {
 
         test_utils::init_db(tmp_path);
 
-        run_commit_command("data/untitled.blend", tmp_path, Some("Message".to_owned()));
-        run_commit_command(
+        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+        create_new_commit(
             "data/untitled_2.blend",
             tmp_path,
             Some("Message".to_owned()),

@@ -25,7 +25,7 @@ pub struct ShortCommitRecord {
 }
 
 #[derive(Debug)]
-pub struct DBError(String);
+pub struct DBError(pub String);
 
 pub trait DB: Sized {
     fn open(path: &str) -> Result<Self, DBError>;

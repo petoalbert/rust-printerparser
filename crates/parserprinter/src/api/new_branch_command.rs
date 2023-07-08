@@ -2,7 +2,7 @@ use crate::db_ops::{Persistence, DB};
 
 use super::invariants::check_current_branch_current_commit_set;
 
-pub fn run_new_branch_command(db_path: &str, new_branch_name: String) {
+pub fn run_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), String> {
     let db = Persistence::open(db_path).expect("Cannot open DB");
 
     check_current_branch_current_commit_set(&db);
@@ -12,21 +12,23 @@ pub fn run_new_branch_command(db_path: &str, new_branch_name: String) {
         .expect("Cannot read current branch name");
 
     if current_brach_name != "main" {
-        println!("New branches can only be created if main is the current branch")
+        return Err("New branches can only be created if main is the current branch".to_owned());
     }
 
     let tip = db
         .read_current_latest_commit()
         .expect("Cannot read current branch tip");
 
-    db.write_branch_tip(&new_branch_name, &tip)
+    db.write_branch_tip(new_branch_name, &tip)
         .expect("Cannot create new branch");
 
-    db.write_current_branch_name(&new_branch_name)
+    db.write_current_branch_name(new_branch_name)
         .expect("Cannot set current branch name");
 
     db.write_current_latest_commit(&tip)
         .expect("Cannot set new branch name");
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -38,7 +40,7 @@ mod test {
         db_ops::{Persistence, DB},
     };
 
-    use super::run_new_branch_command;
+    use super::run_new_branch;
 
     #[test]
     fn test_create_new_branch() {
@@ -47,7 +49,7 @@ mod test {
 
         test_utils::init_db(tmp_db_path);
 
-        run_new_branch_command(tmp_db_path, "dev".to_owned());
+        run_new_branch(tmp_db_path, "dev");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
@@ -80,7 +82,7 @@ mod test {
         // a commit to `main`
         test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
 
-        run_new_branch_command(tmp_db_path, "dev".to_owned());
+        run_new_branch(tmp_db_path, "dev");
 
         // a commit to `other`
         test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");

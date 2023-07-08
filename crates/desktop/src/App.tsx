@@ -54,10 +54,11 @@ const RoundedButton = styled.div`
 
 function App() {
   const [path, setPath] = React.useState<string | null>(
-    "/Users/bertalankormendy/Developer/rust-printerparser/crates/parserprinter/data/untitled.timeline"
+    "/Users/bertalankormendy/Developer/rust-printerparser/crates/parserprinter/data/temp/untitled.timeline"
   );
   const [branches, setBranches] = React.useState<string[]>([]);
   const [commits, setCommits] = React.useState<string[]>([]);
+  const [currentBranch, setCurrentBranch] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (path == null) {
@@ -71,6 +72,9 @@ function App() {
       ),
       invoke("db_log_checkpoints", { dbPath: path }).then((commits) =>
         setCommits((commits as { hash: string }[]).map((c) => c.hash))
+      ),
+      invoke("db_get_current_branch", { dbPath: path }).then((currentBranch) =>
+        setCurrentBranch(currentBranch as string)
       ),
     ]);
   }, [path]);
@@ -102,7 +106,11 @@ function App() {
   return (
     <Container>
       <Sidebar>
-        <Spacer height={100} />
+        <Spacer height={50} />
+        {currentBranch == null
+          ? "No branch selected"
+          : `Current branch: ${currentBranch}`}
+        <Spacer height={50} />
         <RoundedButton>New branch</RoundedButton>
         {branches.map((branch) => (
           <div key={branch}>{branch}</div>

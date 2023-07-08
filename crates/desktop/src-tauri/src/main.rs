@@ -5,7 +5,8 @@ mod serde_instances;
 
 use crate::serde_instances::ShortCommitRecordWrapper;
 use parserprinter::api::{
-    list_branches_command::list_braches, log_checkpoints_command::log_checkpoints,
+    get_current_brach::get_current_brach, list_branches_command::list_braches,
+    log_checkpoints_command::log_checkpoints,
 };
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
@@ -22,11 +23,17 @@ fn db_log_checkpoints(db_path: &str) -> Vec<ShortCommitRecordWrapper> {
         .collect()
 }
 
+#[tauri::command]
+fn db_get_current_branch(db_path: &str) -> String {
+    get_current_brach(db_path)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             db_list_braches,
-            db_log_checkpoints
+            db_log_checkpoints,
+            db_get_current_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
