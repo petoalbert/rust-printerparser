@@ -9,8 +9,8 @@ use parserprinter::api::{
     list_branches_command::list_braches,
     log_checkpoints_command::log_checkpoints,
     new_branch_command::run_new_branch,
-    restore_command::run_restore_command,
-    switch_command::run_switch_command,
+    restore_command::restore_checkpoint,
+    switch_command::switch_branches,
     test_command::run_command_test,
 };
 
@@ -36,6 +36,14 @@ fn run_create_new_commit(db_path: &str, file_path: &str, message: Option<String>
     create_new_commit(file_path, db_path, message).expect("Cannot create new commit")
 }
 
+fn run_restore_checkpoint(db_path: &str, file_path: &str, hash: &str) {
+    restore_checkpoint(file_path, db_path, hash).expect("Cannot restore checkpoint")
+}
+
+fn run_switch_branches(db_path: &str, file_path: &str, branch_name: &str) {
+    switch_branches(db_path, branch_name, file_path).expect("Cannot switch branches")
+}
+
 fn main() {
     let args = parse_args();
     match args.command {
@@ -51,7 +59,7 @@ fn main() {
             db_path,
             file_path,
             hash,
-        } => run_restore_command(&file_path, &db_path, &hash),
+        } => run_restore_checkpoint(&db_path, &file_path, &hash),
         Commands::NewBranch {
             db_path,
             branch_name,
@@ -61,7 +69,7 @@ fn main() {
             db_path,
             branch,
             file_path,
-        } => run_switch_command(&db_path, &branch, &file_path),
+        } => run_switch_branches(&db_path, &branch, &file_path),
         Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, branch),
         Commands::Init { db_path } => run_init_command(&db_path),
     }

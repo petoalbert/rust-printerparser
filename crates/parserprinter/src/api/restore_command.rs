@@ -5,28 +5,27 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     blend::utils::to_file_transactional,
-    db_ops::{Persistence, DB},
+    db_ops::{DBError, Persistence, DB},
     measure_time,
     printer_parser::printerparser::PrinterParser,
 };
 
 use super::utils::hash_list;
 
-pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
+pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<(), DBError> {
     let end_to_end_timer = Instant::now();
 
     let conn = Persistence::open(db_path).expect("Cannot open DB");
 
     let commit = measure_time!(format!("Reading commit {:?}", hash), {
-        conn.read_commit(hash)
-            .expect("cannot read commit")
-            .expect("no such commit found")
-    });
+        conn.read_commit(hash)?
+            .ok_or(DBError("no such commit found".to_owned()))
+    })?;
 
     let block_hashes = measure_time!(format!("Reading blocks {:?}", hash), {
         hash_list()
             .parse(&commit.blocks, &mut ())
-            .expect("Cannot parse blocks")
+            .map_err(|_| DBError("Cannot parse blocks".to_owned()))?
             .1
     });
 
@@ -34,7 +33,7 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
 
     let block_data: Vec<Vec<u8>> = measure_time!(format!("Decompressing blocks {:?}", hash), {
         conn.read_blocks(block_hashes)
-            .expect("Cannot read block hashes")
+            .map_err(|_| DBError("Cannot read block hashes".to_owned()))?
             .par_iter()
             .map(|record| {
                 let mut writer = Vec::new();
@@ -53,25 +52,29 @@ pub fn run_restore_command(file_path: &str, db_path: &str, hash: &str) {
 
         header.append(b"ENDB".to_vec().as_mut());
 
-        to_file_transactional(file_path, header).expect("Cannot write to file");
+        to_file_transactional(file_path, header)
+            .map_err(|_| DBError("Cannot write to file".to_owned()))?;
     });
 
-    conn.write_current_branch_name(&commit.branch)
-        .expect("Cannot write current branch");
+    conn.write_current_branch_name(&commit.branch)?;
 
-    conn.write_current_latest_commit(&commit.hash)
-        .expect("Cannot set latest commit");
+    conn.write_current_latest_commit(&commit.hash)?;
 
     println!("Checkout took: {:?}", end_to_end_timer.elapsed());
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use tempfile::{NamedTempFile, TempDir};
 
-    use crate::{api::test_utils, db_ops::{Persistence, DB}};
+    use crate::{
+        api::test_utils,
+        db_ops::{Persistence, DB},
+    };
 
-    use super::run_restore_command;
+    use super::restore_checkpoint;
 
     #[test]
     fn test_restore() {
@@ -85,18 +88,21 @@ mod test {
 
         let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
 
-        run_restore_command(
+        restore_checkpoint(
             tmp_blend_path.path().to_str().unwrap(),
             tmp_db_path,
             "a5f92d0a988085ed66c9dcdccc7b9c90",
-        );
+        )
+        .expect("Cannot restore checkpoint");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
         // Number of commits stays the same
         assert_eq!(db.read_all_commits().unwrap().len(), 2);
 
-        let current_branch_name = db.read_current_branch_name().expect("Cannot read current branch name");
+        let current_branch_name = db
+            .read_current_branch_name()
+            .expect("Cannot read current branch name");
 
         // The current branch name stays the same
         assert_eq!(current_branch_name, "main");

@@ -143,7 +143,7 @@ mod test {
 
         test_utils::init_db(tmp_path);
 
-        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
@@ -190,12 +190,12 @@ mod test {
 
         test_utils::init_db(tmp_path);
 
-        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned()));
+        create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
         create_new_commit(
             "data/untitled_2.blend",
             tmp_path,
             Some("Message".to_owned()),
-        );
+        ).unwrap();
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 

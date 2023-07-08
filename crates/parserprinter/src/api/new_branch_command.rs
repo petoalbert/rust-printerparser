@@ -49,7 +49,7 @@ mod test {
 
         test_utils::init_db(tmp_db_path);
 
-        run_new_branch(tmp_db_path, "dev");
+        run_new_branch(tmp_db_path, "dev").unwrap();
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
@@ -82,7 +82,7 @@ mod test {
         // a commit to `main`
         test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
 
-        run_new_branch(tmp_db_path, "dev");
+        run_new_branch(tmp_db_path, "dev").unwrap();
 
         // a commit to `other`
         test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");

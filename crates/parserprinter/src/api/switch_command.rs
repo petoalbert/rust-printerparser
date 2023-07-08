@@ -1,32 +1,27 @@
-use crate::db_ops::{Persistence, DB};
+use crate::db_ops::{DBError, Persistence, DB};
 
-use super::restore_command::run_restore_command;
+use super::restore_command::restore_checkpoint;
 
-pub fn run_switch_command(db_path: &str, branch_name: &str, file_path: &str) {
+pub fn switch_branches(db_path: &str, branch_name: &str, file_path: &str) -> Result<(), DBError> {
     let hash = {
         let db = Persistence::open(db_path).expect("Cannot open db");
 
-        let tip = db
-            .read_branch_tip(branch_name)
-            .expect("Cannot read branch tip");
+        let tip = db.read_branch_tip(branch_name)?;
 
         if tip.is_none() {
-            print!("Branch does not exist: {:?}", branch_name);
-            return;
+            return Ok(()); // FIXME
         }
 
         let hash = tip.unwrap();
 
-        db.write_current_branch_name(branch_name)
-            .expect("Cannot set branch as current branch");
+        db.write_current_branch_name(branch_name)?;
 
-        db.write_current_latest_commit(&hash)
-            .expect("Cannot write latest commit hash");
+        db.write_current_latest_commit(&hash)?;
 
         hash
     };
 
-    run_restore_command(file_path, db_path, &hash);
+    restore_checkpoint(file_path, db_path, &hash)
 }
 
 #[cfg(test)]
@@ -38,7 +33,7 @@ mod test {
         db_ops::{Persistence, DB},
     };
 
-    use super::run_switch_command;
+    use super::switch_branches;
 
     #[test]
     fn test_checkout_non_existent_branch() {
@@ -47,7 +42,7 @@ mod test {
 
         test_utils::init_db(tmp_db_path);
 
-        run_switch_command(tmp_db_path, "unknown", "void.blend");
+        switch_branches(tmp_db_path, "unknown", "void.blend").expect("Cannotttt switch branches");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
@@ -94,7 +89,8 @@ mod test {
 
         let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
 
-        run_switch_command(tmp_db_path, "main", tmp_blend_path.path().to_str().unwrap());
+        switch_branches(tmp_db_path, "main", tmp_blend_path.path().to_str().unwrap())
+            .expect("Cannot switch branches");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
@@ -108,6 +104,5 @@ mod test {
 
         let main_tip = db.read_branch_tip("main").unwrap().unwrap();
         assert_eq!(lastest_commit_hash, main_tip);
-        
     }
 }
