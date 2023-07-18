@@ -69,7 +69,7 @@ fn main() {
             db_path,
             branch,
             file_path,
-        } => run_switch_branches(&db_path, &branch, &file_path),
+        } => run_switch_branches(&db_path, &file_path, &branch),
         Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, branch),
         Commands::Init { db_path } => run_init_command(&db_path),
     }
