@@ -361,10 +361,32 @@ impl DB for Persistence {
     }
 
     fn import_exchange(&self, exchange: Exchange) -> Result<(), DBError> {
+        let mut new_branches: HashMap<String, (u64, String)> = HashMap::new();
         for commit in exchange.commits {
+            let commit_hash = commit.hash.clone();
+            let commit_date = commit.date;
+            let commit_branch = commit.branch.clone();
+
             self.write_commit(commit)?;
+
+            let latest = new_branches.get(&commit_branch);
+            match latest {
+                None => {
+                    new_branches.insert(commit_branch, (commit_date, commit_hash));
+                }
+                Some((date, _)) if commit_date > (*date) => {
+                    new_branches.insert(commit_branch, (commit_date, commit_hash));
+                }
+                _ => {}
+            }
         }
 
-        self.write_blocks(&exchange.blocks)
+        for (branch, (_, tip)) in new_branches {
+            self.write_branch_tip(&branch, &tip)?;
+        }
+
+        self.write_blocks(&exchange.blocks)?;
+
+        Ok(())
     }
 }
