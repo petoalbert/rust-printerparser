@@ -2,9 +2,9 @@ use crate::printer_parser::combinator::*;
 use crate::printer_parser::numbers::{be_u32, be_u64, le_u32, le_u64};
 use crate::printer_parser::printerparser::*;
 
-use crate::blend::blend::{Endianness, Header, PointerSize};
+use crate::blend::blend_file::{Endianness, Header, PointerSize};
 
-use super::blend::SimpleParsedBlock;
+use super::blend_file::SimpleParsedBlock;
 use super::utils::{to_left, to_right, Either};
 
 #[derive(Clone)]

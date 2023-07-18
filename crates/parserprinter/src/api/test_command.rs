@@ -1,6 +1,6 @@
 use crate::{
     blend::{
-        blend::{Endianness, PointerSize},
+        blend_file::{Endianness, PointerSize},
         parsers::{blend, BlendFileParseState},
         utils::{from_file, to_file_transactional},
     },

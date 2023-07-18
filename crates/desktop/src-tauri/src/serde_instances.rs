@@ -1,4 +1,4 @@
-use parserprinter::db_ops::ShortCommitRecord;
+use parserprinter::db::db_ops::ShortCommitRecord;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 pub struct ShortCommitRecordWrapper(pub ShortCommitRecord);
 

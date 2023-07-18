@@ -1,27 +1,20 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
+
+use crate::{exchange::Exchange, printer_parser::printerparser::PrinterParser};
+
+use super::structs::{hash_list, BlockRecord, Commit};
 
 type Connection = rusqlite::Connection;
-
-pub struct BlockRecord {
-    pub hash: String,
-    pub data: Vec<u8>,
-}
-
-pub struct Commit {
-    pub hash: String,
-    pub prev_commit_hash: String,
-    pub branch: String,
-    pub message: String,
-    pub author: String,
-    pub date: u64,
-    pub header: Vec<u8>,
-    pub blocks: String,
-}
 
 pub struct ShortCommitRecord {
     pub hash: String,
     pub branch: String,
     pub message: String,
+}
+
+pub struct ExportResult {
+    pub exchange: Exchange,
+    pub skipped: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -52,6 +45,9 @@ pub trait DB: Sized {
 
     fn read_branch_tip(&self, branch_name: &str) -> Result<Option<String>, DBError>;
     fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError>;
+
+    fn export_commits(&self, commits: Vec<String>) -> Result<ExportResult, DBError>;
+    fn import_exchange(&self, exchange: Exchange) -> Result<(), DBError>;
 }
 
 pub struct Persistence {
@@ -326,5 +322,49 @@ impl DB for Persistence {
         self.rocks_db
             .put(current_latest_commit_key(), hash)
             .map_err(|e| DBError(format!("Cannot get latest commit hash: {:?}", e)))
+    }
+
+    fn export_commits(&self, hashes: Vec<String>) -> Result<ExportResult, DBError> {
+        let mut blobs: HashMap<String, Vec<u8>> = HashMap::new();
+        let mut commits: Vec<Commit> = vec![];
+        let mut skipped: Vec<String> = vec![];
+
+        for hash in hashes {
+            let commit = self.read_commit(&hash)?;
+            if let Some(commit) = commit {
+                let hashes = hash_list()
+                    .parse(&commit.blocks, &mut ())
+                    .map_err(|_| DBError("Cannot parse blocks".to_owned()))?
+                    .1;
+
+                commits.push(commit);
+
+                let blocks = self.read_blocks(hashes)?;
+
+                for block in blocks {
+                    blobs.insert(block.hash, block.data);
+                }
+            } else {
+                skipped.push(hash)
+            }
+        }
+
+        let blocks: Vec<BlockRecord> = blobs
+            .into_iter()
+            .map(|(hash, data)| BlockRecord { hash, data })
+            .collect();
+
+        Ok(ExportResult {
+            exchange: Exchange { commits, blocks },
+            skipped,
+        })
+    }
+
+    fn import_exchange(&self, exchange: Exchange) -> Result<(), DBError> {
+        for commit in exchange.commits {
+            self.write_commit(commit)?;
+        }
+
+        self.write_blocks(&exchange.blocks)
     }
 }

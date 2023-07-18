@@ -1,4 +1,4 @@
-use crate::db_ops::{Persistence, ShortCommitRecord, DB};
+use crate::db::db_ops::{Persistence, ShortCommitRecord, DB};
 
 pub fn log_checkpoints(db_path: &str, branch_name: Option<String>) -> Vec<ShortCommitRecord> {
     let conn = Persistence::open(db_path).expect("Cannot open the DB");

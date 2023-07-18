@@ -1,4 +1,4 @@
-use crate::db_ops::{Persistence, DB};
+use crate::db::db_ops::{Persistence, DB};
 
 pub fn check_current_branch_current_commit_set(conn: &Persistence) {
     let current_branch = conn

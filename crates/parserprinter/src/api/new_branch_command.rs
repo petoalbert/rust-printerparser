@@ -1,4 +1,4 @@
-use crate::db_ops::{Persistence, DB};
+use crate::db::db_ops::{Persistence, DB};
 
 use super::invariants::check_current_branch_current_commit_set;
 
@@ -37,7 +37,7 @@ mod test {
 
     use crate::{
         api::test_utils,
-        db_ops::{Persistence, DB},
+        db::db_ops::{Persistence, DB},
     };
 
     use super::run_new_branch;

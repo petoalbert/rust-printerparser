@@ -1,4 +1,4 @@
-use crate::db_ops::{Persistence, DB};
+use crate::db::db_ops::{Persistence, DB};
 
 pub fn run_init_command(db_path: &str) {
     let db = Persistence::open(db_path).expect("Cannot open DB");
@@ -14,7 +14,7 @@ pub fn run_init_command(db_path: &str) {
 mod test {
     use tempfile::TempDir;
 
-    use crate::db_ops::{Persistence, DB};
+    use crate::db::db_ops::{Persistence, DB};
 
     use super::run_init_command;
 

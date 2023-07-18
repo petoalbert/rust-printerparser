@@ -4,11 +4,14 @@ use rayon::prelude::*;
 use crate::{
     api::invariants::{check_current_branch_current_commit_set, check_no_detached_head_invariant},
     blend::{
-        blend::{Endianness, PointerSize},
+        blend_file::{Endianness, PointerSize},
         parsers::{blend, block, header as pheader, BlendFileParseState},
         utils::from_file,
     },
-    db_ops::{BlockRecord, Commit, DBError, Persistence, DB},
+    db::{
+        db_ops::{DBError, Persistence, DB},
+        structs::{hash_list, BlockRecord, Commit},
+    },
     measure_time,
     printer_parser::printerparser::PrinterParser,
 };
@@ -17,8 +20,6 @@ use std::{
     io::Write,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-
-use super::utils::hash_list;
 
 pub fn create_new_commit(
     file_path: &str,
@@ -131,7 +132,7 @@ mod test {
 
     use crate::{
         api::test_utils,
-        db_ops::{Persistence, DB},
+        db::db_ops::{Persistence, DB},
     };
 
     use super::create_new_commit;
@@ -195,7 +196,8 @@ mod test {
             "data/untitled_2.blend",
             tmp_path,
             Some("Message".to_owned()),
-        ).unwrap();
+        )
+        .unwrap();
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 

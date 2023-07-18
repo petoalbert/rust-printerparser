@@ -5,12 +5,13 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     blend::utils::to_file_transactional,
-    db_ops::{DBError, Persistence, DB},
+    db::{
+        db_ops::{DBError, Persistence, DB},
+        structs::hash_list,
+    },
     measure_time,
     printer_parser::printerparser::PrinterParser,
 };
-
-use super::utils::hash_list;
 
 pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<(), DBError> {
     let end_to_end_timer = Instant::now();
@@ -71,7 +72,7 @@ mod test {
 
     use crate::{
         api::test_utils,
-        db_ops::{Persistence, DB},
+        db::db_ops::{Persistence, DB},
     };
 
     use super::restore_checkpoint;

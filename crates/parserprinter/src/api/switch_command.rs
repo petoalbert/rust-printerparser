@@ -1,4 +1,4 @@
-use crate::db_ops::{DBError, Persistence, DB};
+use crate::db::db_ops::{DBError, Persistence, DB};
 
 use super::restore_command::restore_checkpoint;
 
@@ -30,7 +30,7 @@ mod test {
 
     use crate::{
         api::test_utils,
-        db_ops::{Persistence, DB},
+        db::db_ops::{Persistence, DB},
     };
 
     use super::switch_branches;
