@@ -38,6 +38,18 @@ def call_checkpoints_api():
     response = requests.get(url)
     return response.json()
 
+def call_restore_api(hash):
+    file_path = get_file_path()
+    db_path = get_db_path(file_path)
+    url = 'http://127.0.0.1:8080/restore'
+    headers = {'Content-Type': 'application/json'} 
+    data = {
+        'db_path': db_path,
+        'file_path': file_path,
+        'hash': hash,
+    }
+
+    return requests.post(url, headers=headers, data=json.dumps(data))
 
 def onload_operator():
     bpy.ops.wm.onload_operator()
@@ -66,11 +78,13 @@ class CommitItem(bpy.types.PropertyGroup):
 
 class CheckoutItemOperator(bpy.types.Operator):
     bl_idname = "my.checkout_item"
-    bl_label = "Update Item"
+    bl_label = "Restore"
     hash: bpy.props.StringProperty(name="Hash", default="")
 
     def execute(self, context):
-        self.report({'INFO'}, f"{self.hash}")
+        call_restore_api(self.hash)
+        bpy.ops.wm.revert_mainfile()
+        onload_operator()
         return {'FINISHED'}
 
 class CommitOperator(bpy.types.Operator):
@@ -83,6 +97,7 @@ class CommitOperator(bpy.types.Operator):
         message = context.scene.commit_message
         response = call_commit_api(message)
         self.report({'INFO'}, f"{response.status_code}")
+        onload_operator()
         return {'FINISHED'}
 
 class TimelinePanel(bpy.types.Panel):
