@@ -4,9 +4,8 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use parserprinter::api::{
-    commit_command::create_new_commit,
-    log_checkpoints_command::log_checkpoints,
-    restore_command::{self, restore_checkpoint},
+    commit_command::create_new_commit, log_checkpoints_command::log_checkpoints,
+    restore_command::restore_checkpoint,
 };
 use serde::{Deserialize, Serialize};
 

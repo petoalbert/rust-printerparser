@@ -23,5 +23,8 @@ pub fn run_command_test(from_file_path: String, to_file_path: String) {
         .write(&(header, blocks), &mut parse_state)
         .expect("cannot serialize blender file");
 
-    to_file_transactional(&to_file_path, write_back).expect("cannot write to file")
+    let p1 = vec![];
+    let p2 = vec![];
+
+    to_file_transactional(&to_file_path, write_back, p1, p2).expect("cannot write to file")
 }

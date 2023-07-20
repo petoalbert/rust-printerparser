@@ -47,13 +47,7 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
     });
 
     measure_time!(format!("Writing file {:?}", hash), {
-        for mut data in block_data {
-            header.append(data.as_mut());
-        }
-
-        header.append(b"ENDB".to_vec().as_mut());
-
-        to_file_transactional(file_path, header)
+        to_file_transactional(file_path, header, block_data, b"ENDB".to_vec())
             .map_err(|_| DBError("Cannot write to file".to_owned()))?;
     });
 

@@ -67,11 +67,23 @@ pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
     Ok(data)
 }
 
-pub fn to_file_transactional(path: &str, data: Vec<u8>) -> Result<(), Error> {
+pub fn to_file_transactional(
+    path: &str,
+    header: Vec<u8>,
+    blocks: Vec<Vec<u8>>,
+    terminator: Vec<u8>,
+) -> Result<(), Error> {
     let temp_file = NamedTempFile::new()?;
 
     let mut gz = GzEncoder::new(&temp_file, Compression::default());
-    gz.write_all(&data)?;
+    gz.write_all(&header)?;
+
+    for block in blocks {
+        gz.write_all(&block)?;
+    }
+
+    gz.write_all(&terminator)?;
+
     gz.flush()?;
     gz.finish()?;
 
