@@ -30,7 +30,7 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
             .1
     });
 
-    let mut header = commit.header;
+    let header = commit.header;
 
     let block_data: Vec<Vec<u8>> = measure_time!(format!("Decompressing blocks {:?}", hash), {
         conn.read_blocks(block_hashes)

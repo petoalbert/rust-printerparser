@@ -4,8 +4,9 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use parserprinter::api::{
-    commit_command::create_new_commit, log_checkpoints_command::log_checkpoints,
-    restore_command::restore_checkpoint,
+    commit_command::create_new_commit, list_branches_command::list_braches,
+    log_checkpoints_command::log_checkpoints, new_branch_command::create_new_branch,
+    restore_command::restore_checkpoint, switch_command::switch_branches,
 };
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +66,43 @@ pub struct RestorePayload {
 pub async fn restore(data: Json<RestorePayload>) -> impl Responder {
     let result = restore_checkpoint(&data.file_path, &data.db_path, &data.hash);
 
+    match result {
+        Err(_) => HttpResponse::BadRequest(),
+        Ok(_) => HttpResponse::Ok(),
+    }
+}
+
+#[get("/branches/{db_path}")]
+pub async fn branches(path: web::Path<(String,)>) -> impl Responder {
+    let result = list_braches(&path.0.to_owned());
+    HttpResponse::Ok().json(result)
+}
+
+#[derive(Deserialize)]
+pub struct NewBranchPayload {
+    db_path: String,
+    branch_name: String,
+}
+
+#[post("/branches/new")]
+pub async fn new_branch(data: Json<NewBranchPayload>) -> impl Responder {
+    let result = create_new_branch(&data.db_path, &data.branch_name);
+    match result {
+        Err(_) => HttpResponse::BadRequest(),
+        Ok(_) => HttpResponse::Ok(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SwitchBranchPayload {
+    db_path: String,
+    branch_name: String,
+    file_path: String,
+}
+
+#[post("/branches/switch")]
+pub async fn switch_branch(data: Json<SwitchBranchPayload>) -> impl Responder {
+    let result = switch_branches(&data.db_path, &data.branch_name, &data.file_path);
     match result {
         Err(_) => HttpResponse::BadRequest(),
         Ok(_) => HttpResponse::Ok(),

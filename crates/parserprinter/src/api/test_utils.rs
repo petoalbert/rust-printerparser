@@ -15,7 +15,7 @@ pub fn commit(db_path: &str, message: &str, blend_path: &str) {
 
 #[cfg(test)]
 pub fn new_branch(db_path: &str, name: &str) {
-    use super::new_branch_command::run_new_branch;
+    use super::new_branch_command::create_new_branch;
 
-    run_new_branch(db_path, name).expect("Cannot create new branch")
+    create_new_branch(db_path, name).expect("Cannot create new branch")
 }

@@ -2,7 +2,7 @@ use crate::db::db_ops::{Persistence, DB};
 
 use super::invariants::check_current_branch_current_commit_set;
 
-pub fn run_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), String> {
+pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), String> {
     let db = Persistence::open(db_path).expect("Cannot open DB");
 
     check_current_branch_current_commit_set(&db);
@@ -40,7 +40,7 @@ mod test {
         db::db_ops::{Persistence, DB},
     };
 
-    use super::run_new_branch;
+    use super::create_new_branch;
 
     #[test]
     fn test_create_new_branch() {
@@ -49,7 +49,7 @@ mod test {
 
         test_utils::init_db(tmp_db_path);
 
-        run_new_branch(tmp_db_path, "dev").unwrap();
+        create_new_branch(tmp_db_path, "dev").unwrap();
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
@@ -82,7 +82,7 @@ mod test {
         // a commit to `main`
         test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
 
-        run_new_branch(tmp_db_path, "dev").unwrap();
+        create_new_branch(tmp_db_path, "dev").unwrap();
 
         // a commit to `other`
         test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");

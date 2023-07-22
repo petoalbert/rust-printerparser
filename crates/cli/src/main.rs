@@ -8,7 +8,7 @@ use parserprinter::api::{
     init_command::run_init_command,
     list_branches_command::list_braches,
     log_checkpoints_command::log_checkpoints,
-    new_branch_command::run_new_branch,
+    new_branch_command::create_new_branch,
     restore_command::restore_checkpoint,
     switch_command::switch_branches,
     test_command::run_command_test,
@@ -29,7 +29,7 @@ fn print_checkpoints(db_path: &str, branch_name: Option<String>) {
 }
 
 fn run_new_branch_command(db_path: &str, new_branch_name: &str) {
-    run_new_branch(db_path, new_branch_name).expect("Cannot create new branch")
+    create_new_branch(db_path, new_branch_name).expect("Cannot create new branch")
 }
 
 fn run_create_new_commit(db_path: &str, file_path: &str, message: Option<String>) {
