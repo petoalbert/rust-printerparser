@@ -37,6 +37,8 @@ These operations aim to preserve invariants before/after DB operations.
 #### Wire format
 The API features a very basic export/import functionality, which can export/import a number of commits and the blocks they refer to. This is a binary format, implemented with the `printer_parser` machinery (see `exchange.rs` for details).
 
+Since the format only includes commits and blocks, the branches they refer to have to be reconstructed from the commits. Also, it's not guaranteed that the exported commits are actually rooted in `main` (but this is a big blind spot in the rest of the code too). On the other hand, this format makes it dead simple to sync to other timeline DBs, since the transmitted commits describe themselves.
+
 ### `cli`
 
 `cli` uses `clap` to implement a thin wrapper around the high-level ops in `api`.
