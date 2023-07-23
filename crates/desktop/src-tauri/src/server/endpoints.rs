@@ -42,15 +42,16 @@ struct ShortCommitPayload {
     message: String,
 }
 
-#[get("/checkpoints/{db_path}")]
-pub async fn checkpoints(path: web::Path<(String,)>) -> impl Responder {
-    let checkpoints: Vec<ShortCommitPayload> = log_checkpoints(&path.0.to_owned(), None)
-        .into_iter()
-        .map(|checkpoint| ShortCommitPayload {
-            hash: checkpoint.hash,
-            message: checkpoint.message,
-        })
-        .collect();
+#[get("/checkpoints/{db_path}/{branch}")]
+pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
+    let checkpoints: Vec<ShortCommitPayload> =
+        log_checkpoints(&path.0.to_owned(), Some(path.1.to_owned()))
+            .into_iter()
+            .map(|checkpoint| ShortCommitPayload {
+                hash: checkpoint.hash,
+                message: checkpoint.message,
+            })
+            .collect();
 
     HttpResponse::Ok().json(checkpoints)
 }

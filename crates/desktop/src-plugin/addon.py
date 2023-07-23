@@ -66,10 +66,10 @@ def call_new_branch_api(new_branch_name):
 
     return requests.post(url, headers=headers, data=json.dumps(data))
 
-def call_list_branches_api():
+def call_list_branches_api(current_branch):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
-    url = f'{URL}/branches/{quote_plus(db_path)}'
+    url = f'{URL}/branches/{quote_plus(db_path)}/{quote_plus(current_branch)}'
     
     response = requests.get(url)
     return response.json()
@@ -138,17 +138,22 @@ class ListBranchesOperator(bpy.types.Operator):
     bl_idname = "wm.list_branches_operator"
     bl_label = "List Branches"
     
-    def execute(self, _):
-        self.report({'INFO'}, "Calling branches api...")
-        branches = call_list_branches_api()
+    def execute(self, context):
+        file_path = get_file_path()
+        db_path = get_db_path(file_path)
+        current_branch = "main" if context.scene.current_branch == None else context.scene.current_branch
+        url = f'{URL}/branches/{quote_plus(db_path)}/{quote_plus(current_branch)}'
 
-        self.report({'INFO'}, f"{branches}")
+        self.report({'INFO'}, url)
+        # branches = call_list_branches_api(current_branch)
 
-        bpy.context.scene.branch_items.clear()
+        # self.report({'INFO'}, f"{branches}")
 
-        for branch in branches:
-            item = bpy.context.scene.branch_items.add()
-            item.name = branch
+        # bpy.context.scene.branch_items.clear()
+
+        # for branch in branches:
+        #     item = bpy.context.scene.branch_items.add()
+        #     item.name = branch
     
         return {'FINISHED'}
     
@@ -223,6 +228,14 @@ class CommitOperator(bpy.types.Operator):
         run_onload_ops()
         return {'FINISHED'}
 
+class RefreshOperator(bpy.types.Operator):
+    bl_idname = "my.refresh"
+    bl_label = "Refresh"
+
+    def execute(self, _):
+        run_onload_ops()
+        return {'FINISHED'}
+
 class TimelinePanel(bpy.types.Panel):
     bl_label = "Timeline"
     bl_idname = "TimelinePanel"
@@ -258,6 +271,8 @@ class TimelinePanel(bpy.types.Panel):
         checkpoint_box.prop(context.scene, "commit_message", text="")
         checkpoint_box.operator("my.commit", text="Create Checkpoint")
 
+        layout.operator("my.refresh", text="Refresh")
+
 def register():
     bpy.utils.register_class(ListCheckpointsOperator)
     bpy.utils.register_class(ListBranchesOperator)
@@ -268,6 +283,7 @@ def register():
     bpy.utils.register_class(BranchItem)
     bpy.utils.register_class(CheckoutItemOperator)
     bpy.utils.register_class(CommitOperator)
+    bpy.utils.register_class(RefreshOperator)
     bpy.utils.register_class(TimelinePanel)
 
     bpy.types.Scene.checkpoint_items = bpy.props.CollectionProperty(type=CommitItem)
@@ -287,6 +303,7 @@ def unregister():
     bpy.utils.unregister_class(BranchItem)
     bpy.utils.unregister_class(CheckoutItemOperator)
     bpy.utils.unregister_class(CommitOperator)
+    bpy.utils.unregister_class(RefreshOperator)
     bpy.utils.unregister_class(TimelinePanel)
 
     del bpy.types.Scene.checkpoint_items
