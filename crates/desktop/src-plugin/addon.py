@@ -1,9 +1,9 @@
 import bpy
-from threading import Timer
 import requests
-from urllib.parse import quote_plus
-import json
 import os
+import json
+from threading import Timer
+from urllib.parse import quote_plus
 
 bl_info = {
     "name": "Timeline Tool",
@@ -178,20 +178,24 @@ class TimelinePanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
+        branches_box = layout.box()
+        branches_box.label(text="Branches")
         for item in context.scene.branch_items:
-            row = layout.row()
+            row = branches_box.row()
             row.label(text=item.name)
             row.operator("wm.switch_branch_operator", text="Switch to").name = item.name
 
+        restore_box = layout.box()
+        restore_box.label(text="Restore checkpoint")
         for item in context.scene.checkpoint_items:
-            row = layout.row()
+            row = restore_box.row()
             row.label(text=item.message)
             row.operator("my.checkout_item", text="Restore").hash = item.hash
 
-        layout.prop(context.scene, "commit_message", text="")
-
-        row = layout.row()
-        row.operator("my.commit", text="Create Checkpoint")
+        checkpoint_box = layout.box()
+        checkpoint_box.label(text="New Checkpoint")
+        checkpoint_box.prop(context.scene, "commit_message", text="")
+        checkpoint_box.operator("my.commit", text="Create Checkpoint")
 
 def register():
     bpy.utils.register_class(ListCheckpointsOperator)
