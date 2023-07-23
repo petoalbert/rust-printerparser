@@ -4,7 +4,30 @@
 
 body {
   height: 100vh;
+  width: 100vw;
   margin: 0;
+
+  font-size: 2em;
+
+  background: radial-gradient(
+        at 18% 99%,
+        rgb(224, 233, 39) 0px,
+        transparent 50%
+      )
+      repeat scroll 0% 0%,
+    radial-gradient(at 97% 8%, rgb(48, 239, 127) 0px, transparent 50%) repeat
+      scroll 0% 0%,
+    radial-gradient(at 79% 82%, rgb(244, 52, 87) 0px, transparent 50%) repeat
+      scroll 0% 0%,
+    radial-gradient(at 96% 10%, rgb(209, 66, 234) 0px, transparent 50%) repeat
+      scroll 0% 0%,
+    radial-gradient(at 42% 20%, rgb(68, 220, 233) 0px, transparent 50%) repeat
+      scroll 0% 0%,
+    radial-gradient(at 4% 49%, rgb(211, 46, 233) 0px, transparent 50%) repeat
+      scroll 0% 0%,
+    rgba(237, 52, 52, 0)
+      radial-gradient(at 57% 33%, rgb(109, 14, 116) 0px, #a299ff 50%) repeat
+      scroll 0% 0%;
 }
 
 :root {
