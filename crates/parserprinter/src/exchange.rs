@@ -12,12 +12,6 @@ use crate::{
     },
 };
 
-/*
-   TOOD
-   - [ ] pp for commit
-   - [ ] pp for blockrecord
-*/
-
 pub struct Exchange {
     pub commits: Vec<Commit>,
     pub blocks: Vec<BlockRecord>,

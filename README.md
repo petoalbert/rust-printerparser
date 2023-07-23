@@ -34,6 +34,9 @@ The tradeoff here was that the writing blocks into SQLite was super slow, on the
 `api` implements a collection of high-level operations, each of which composes multiple DB API calls.
 These operations aim to preserve invariants before/after DB operations.
 
+#### Wire format
+The API features a very basic export/import functionality, which can export/import a number of commits and the blocks they refer to. This is a binary format, implemented with the `printer_parser` machinery (see `exchange.rs` for details).
+
 ### `cli`
 
 `cli` uses `clap` to implement a thin wrapper around the high-level ops in `api`.
