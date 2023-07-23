@@ -32,10 +32,10 @@ def call_commit_api(message):
 
     return requests.post(url, headers=headers, data=json.dumps(data))
 
-def call_checkpoints_api():
+def call_checkpoints_api(current_branch):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
-    url = f'{URL}/checkpoints/{quote_plus(db_path)}'
+    url = f'{URL}/checkpoints/{quote_plus(db_path)}/{quote_plus(current_branch)}'
 
     response = requests.get(url)
     return response.json()
@@ -66,10 +66,10 @@ def call_new_branch_api(new_branch_name):
 
     return requests.post(url, headers=headers, data=json.dumps(data))
 
-def call_list_branches_api(current_branch):
+def call_list_branches_api():
     file_path = get_file_path()
     db_path = get_db_path(file_path)
-    url = f'{URL}/branches/{quote_plus(db_path)}/{quote_plus(current_branch)}'
+    url = f'{URL}/branches/{quote_plus(db_path)}'
     
     response = requests.get(url)
     return response.json()
@@ -120,10 +120,9 @@ class ListCheckpointsOperator(bpy.types.Operator):
     bl_idname = "wm.list_checkpoints_operator"
     bl_label = "List Checkpoints"
     
-    def execute(self, _):
-        self.report({'INFO'}, "Calling checkpoints api...")
-        items = call_checkpoints_api()
-        self.report({'INFO'}, f"{items}")
+    def execute(self, context):
+        current_branch = context.scene.current_branch if context.scene.current_branch != None else "main"
+        items = call_checkpoints_api(current_branch)
         
         bpy.context.scene.checkpoint_items.clear()
 
@@ -139,21 +138,15 @@ class ListBranchesOperator(bpy.types.Operator):
     bl_label = "List Branches"
     
     def execute(self, context):
-        file_path = get_file_path()
-        db_path = get_db_path(file_path)
-        current_branch = "main" if context.scene.current_branch == None else context.scene.current_branch
-        url = f'{URL}/branches/{quote_plus(db_path)}/{quote_plus(current_branch)}'
+        branches = call_list_branches_api()
 
-        self.report({'INFO'}, url)
-        # branches = call_list_branches_api(current_branch)
+        self.report({'INFO'}, f"{branches}")
 
-        # self.report({'INFO'}, f"{branches}")
+        bpy.context.scene.branch_items.clear()
 
-        # bpy.context.scene.branch_items.clear()
-
-        # for branch in branches:
-        #     item = bpy.context.scene.branch_items.add()
-        #     item.name = branch
+        for branch in branches:
+            item = bpy.context.scene.branch_items.add()
+            item.name = branch
     
         return {'FINISHED'}
     
