@@ -4,7 +4,7 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use parserprinter::api::{
-    commit_command::create_new_commit, list_branches_command::list_braches,
+    commit_command::create_new_commit, get_current_branch, list_branches_command::list_braches,
     log_checkpoints_command::log_checkpoints, new_branch_command::create_new_branch,
     restore_command::restore_checkpoint, switch_command::switch_branches,
 };
@@ -106,5 +106,14 @@ pub async fn switch_branch(data: Json<SwitchBranchPayload>) -> impl Responder {
     match result {
         Err(_) => HttpResponse::BadRequest(),
         Ok(_) => HttpResponse::Ok(),
+    }
+}
+
+#[get("/branches/current/{db_path}")]
+pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
+    let result = get_current_branch::get_current_branch(&path.0.to_owned());
+    match result {
+        Err(_) => HttpResponse::BadRequest().json(""), // TODO
+        Ok(branch) => HttpResponse::Ok().json(branch),
     }
 }

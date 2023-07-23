@@ -5,6 +5,7 @@ use cli::{parse_args, Commands};
 use parserprinter::api::{
     commit_command::create_new_commit,
     config_commands::{run_get_name_command, run_set_name_command},
+    get_current_branch::get_current_branch,
     init_command::run_init_command,
     list_branches_command::list_braches,
     log_checkpoints_command::log_checkpoints,
@@ -44,6 +45,11 @@ fn run_switch_branches(db_path: &str, file_path: &str, branch_name: &str) {
     switch_branches(db_path, branch_name, file_path).expect("Cannot switch branches")
 }
 
+fn run_get_current_branch(db_path: &str) {
+    let branch = get_current_branch(db_path).expect("Cannot get active branch");
+    println!("Current branch: {}", branch)
+}
+
 fn main() {
     let args = parse_args();
     match args.command {
@@ -65,6 +71,7 @@ fn main() {
             branch_name,
         } => run_new_branch_command(&db_path, &branch_name),
         Commands::ListBranches { db_path } => print_all_branches(&db_path),
+        Commands::GetCurrentBranch { db_path } => run_get_current_branch(&db_path),
         Commands::Switch {
             db_path,
             branch,

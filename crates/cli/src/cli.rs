@@ -100,6 +100,13 @@ pub enum Commands {
         file_path: String,
     },
 
+    // Gets the currently active branch
+    GetCurrentBranch {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+    },
+
     /// Log all checkpoints for the current branch or a specified branch
     LogCheckpoints {
         /// Path to the blend file DB

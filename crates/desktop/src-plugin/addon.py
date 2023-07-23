@@ -74,6 +74,14 @@ def call_list_branches_api():
     response = requests.get(url)
     return response.json()
 
+def call_get_current_branch_api():
+    file_path = get_file_path()
+    db_path = get_db_path(file_path)
+    url = f'{URL}/branches/current/{quote_plus(db_path)}'
+    
+    response = requests.get(url)
+    return response.json()
+
 def call_switch_branch_api(new_branch_name):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -87,9 +95,26 @@ def call_switch_branch_api(new_branch_name):
 
     return requests.post(url, headers=headers, data=json.dumps(data))
 
-def run_onload_ops():
-    bpy.ops.wm.list_checkpoints_operator()
+def call_list_branches_operator():
     bpy.ops.wm.list_branches_operator()
+
+def call_list_checkpoints_operator():
+    bpy.ops.wm.list_checkpoints_operator()
+
+def call_get_current_branch_operator():
+    bpy.ops.wm.get_current_branch_operator()
+
+def run_onload_ops():
+    call_get_current_branch_operator()
+    call_list_branches_operator()
+    call_list_checkpoints_operator()
+
+def save_file():
+    bpy.ops.wm.save_mainfile()
+
+def refresh_file():
+    bpy.ops.wm.revert_mainfile()
+
 
 class ListCheckpointsOperator(bpy.types.Operator):
     bl_idname = "wm.list_checkpoints_operator"
@@ -126,6 +151,16 @@ class ListBranchesOperator(bpy.types.Operator):
             item.name = branch
     
         return {'FINISHED'}
+    
+class GetCurrentBranchOperator(bpy.types.Operator):
+    bl_idname = "wm.get_current_branch_operator"
+    bl_label = "Get current branch"
+    
+    def execute(self, context):
+        current_branch = call_get_current_branch_api()
+        context.scene.current_branch = current_branch
+
+        return {'FINISHED'}
 
 class SwitchBranchesOperator(bpy.types.Operator):
     bl_idname = "wm.switch_branch_operator"
@@ -134,7 +169,26 @@ class SwitchBranchesOperator(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Branch name", default="")
 
     def execute(self, _):
+        # TODO: if the file is unsaved, ask the user to confirm
+        save_file()
         call_switch_branch_api(self.name)
+        refresh_file()
+        run_onload_ops()
+        return {'FINISHED'}
+
+class NewBranchOperator(bpy.types.Operator):
+    bl_idname = "wm.new_branch_operator"
+    bl_label = "New Branch"
+
+    name: bpy.props.StringProperty(name="Branch name", default="")
+
+    def execute(self, _):
+        call_new_branch_api(self.name)
+        call_list_branches_operator()
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
 
 class CommitItem(bpy.types.PropertyGroup):
     message: bpy.props.StringProperty(name="Message", default="")
@@ -150,8 +204,9 @@ class CheckoutItemOperator(bpy.types.Operator):
     hash: bpy.props.StringProperty(name="Hash", default="")
 
     def execute(self, _):
+        # TODO: if the file is unsaved, ask the user to confirm
         call_restore_api(self.hash)
-        bpy.ops.wm.revert_mainfile()
+        refresh_file()
         run_onload_ops()
         return {'FINISHED'}
 
@@ -160,7 +215,7 @@ class CommitOperator(bpy.types.Operator):
     bl_label = "Commit Operator"
 
     def execute(self, context):
-        bpy.ops.wm.save_mainfile()
+        save_file()
         
         message = context.scene.commit_message
         response = call_commit_api(message)
@@ -180,10 +235,16 @@ class TimelinePanel(bpy.types.Panel):
 
         branches_box = layout.box()
         branches_box.label(text="Branches")
+
+        current_branch_row = branches_box.row()
+        current_branch_row.label(text="Current branch: ")
+        current_branch_row.label(text=context.scene.current_branch)
+
         for item in context.scene.branch_items:
             row = branches_box.row()
             row.label(text=item.name)
             row.operator("wm.switch_branch_operator", text="Switch to").name = item.name
+        branches_box.operator("wm.new_branch_operator", text="New branch")
 
         restore_box = layout.box()
         restore_box.label(text="Restore checkpoint")
@@ -201,6 +262,8 @@ def register():
     bpy.utils.register_class(ListCheckpointsOperator)
     bpy.utils.register_class(ListBranchesOperator)
     bpy.utils.register_class(SwitchBranchesOperator)
+    bpy.utils.register_class(NewBranchOperator)
+    bpy.utils.register_class(GetCurrentBranchOperator)
     bpy.utils.register_class(CommitItem)
     bpy.utils.register_class(BranchItem)
     bpy.utils.register_class(CheckoutItemOperator)
@@ -209,7 +272,8 @@ def register():
 
     bpy.types.Scene.checkpoint_items = bpy.props.CollectionProperty(type=CommitItem)
     bpy.types.Scene.branch_items = bpy.props.CollectionProperty(type=BranchItem)
-    bpy.types.Scene.commit_message = bpy.props.StringProperty(name="")
+    bpy.types.Scene.current_branch = bpy.props.StringProperty(name="")
+    bpy.types.Scene.commit_message = bpy.props.StringProperty(name="", options={'TEXTEDIT_UPDATE'})
 
     Timer(1, run_onload_ops, ()).start()
 
@@ -217,6 +281,8 @@ def unregister():
     bpy.utils.unregister_class(ListCheckpointsOperator)
     bpy.utils.unregister_class(ListBranchesOperator)
     bpy.utils.unregister_class(SwitchBranchesOperator)
+    bpy.utils.unregister_class(NewBranchOperator)
+    bpy.utils.unregister_class(GetCurrentBranchOperator)
     bpy.utils.unregister_class(CommitItem)
     bpy.utils.unregister_class(BranchItem)
     bpy.utils.unregister_class(CheckoutItemOperator)
@@ -226,6 +292,7 @@ def unregister():
     del bpy.types.Scene.checkpoint_items
     del bpy.types.Scene.branch_items
     del bpy.types.Scene.commit_message
+    del bpy.types.Scene.current_branch
 
 if __name__ == "__main__":
     register()
