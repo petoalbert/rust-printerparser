@@ -9,7 +9,7 @@ pub fn switch_branches(db_path: &str, branch_name: &str, file_path: &str) -> Res
         let tip = db.read_branch_tip(branch_name)?;
 
         if tip.is_none() {
-            return Ok(()); // FIXME
+            return Err(DBError("Branch has no corresponding tip".to_owned()));
         }
 
         let hash = tip.unwrap();
