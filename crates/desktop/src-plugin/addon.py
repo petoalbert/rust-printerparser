@@ -115,8 +115,8 @@ def save_file():
 def refresh_file():
     bpy.ops.wm.revert_mainfile()
 
-
 class ListCheckpointsOperator(bpy.types.Operator):
+    """List checkpoints for this branch"""
     bl_idname = "wm.list_checkpoints_operator"
     bl_label = "List Checkpoints"
     
@@ -134,6 +134,7 @@ class ListCheckpointsOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 class ListBranchesOperator(bpy.types.Operator):
+    """List branches for this project"""
     bl_idname = "wm.list_branches_operator"
     bl_label = "List Branches"
     
@@ -151,6 +152,7 @@ class ListBranchesOperator(bpy.types.Operator):
         return {'FINISHED'}
     
 class GetCurrentBranchOperator(bpy.types.Operator):
+    """Find out which branch is active"""
     bl_idname = "wm.get_current_branch_operator"
     bl_label = "Get current branch"
     
@@ -161,6 +163,7 @@ class GetCurrentBranchOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 class SwitchBranchesOperator(bpy.types.Operator):
+    """Switch to another branch"""
     bl_idname = "wm.switch_branch_operator"
     bl_label = "Switch Branch"
 
@@ -175,6 +178,7 @@ class SwitchBranchesOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 class NewBranchOperator(bpy.types.Operator):
+    """Create a new branch"""
     bl_idname = "wm.new_branch_operator"
     bl_label = "New Branch"
 
@@ -195,8 +199,9 @@ class CommitItem(bpy.types.PropertyGroup):
 class BranchItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name", default="")
 
-class CheckoutItemOperator(bpy.types.Operator):
-    bl_idname = "my.checkout_item"
+class RestoreOperator(bpy.types.Operator):
+    """Restore a checkpoint"""
+    bl_idname = "my.restore_operator"
     bl_label = "Restore"
 
     hash: bpy.props.StringProperty(name="Hash", default="")
@@ -208,9 +213,10 @@ class CheckoutItemOperator(bpy.types.Operator):
         run_onload_ops()
         return {'FINISHED'}
 
-class CommitOperator(bpy.types.Operator):
-    bl_idname = "my.commit"
-    bl_label = "Commit Operator"
+class CreateCheckpointOperator(bpy.types.Operator):
+    """Create a new checkpoint"""
+    bl_idname = "my.create_checkpoint_operator"
+    bl_label = "Create Checkpoint Operator"
 
     def execute(self, context):
         save_file()
@@ -222,6 +228,7 @@ class CommitOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 class RefreshOperator(bpy.types.Operator):
+    """Refresh the plugin UI"""
     bl_idname = "my.refresh"
     bl_label = "Refresh"
 
@@ -257,12 +264,12 @@ class TimelinePanel(bpy.types.Panel):
         for item in context.scene.checkpoint_items:
             row = restore_box.row()
             row.label(text=item.message)
-            row.operator("my.checkout_item", text="Restore").hash = item.hash
+            row.operator("my.restore_operator", text="Restore").hash = item.hash
 
         checkpoint_box = layout.box()
         checkpoint_box.label(text="New Checkpoint")
         checkpoint_box.prop(context.scene, "commit_message", text="")
-        checkpoint_box.operator("my.commit", text="Create Checkpoint")
+        checkpoint_box.operator("my.create_checkpoint_operator", text="Create Checkpoint")
 
         layout.operator("my.refresh", text="Refresh")
 
@@ -274,8 +281,8 @@ def register():
     bpy.utils.register_class(GetCurrentBranchOperator)
     bpy.utils.register_class(CommitItem)
     bpy.utils.register_class(BranchItem)
-    bpy.utils.register_class(CheckoutItemOperator)
-    bpy.utils.register_class(CommitOperator)
+    bpy.utils.register_class(RestoreOperator)
+    bpy.utils.register_class(CreateCheckpointOperator)
     bpy.utils.register_class(RefreshOperator)
     bpy.utils.register_class(TimelinePanel)
 
@@ -294,8 +301,8 @@ def unregister():
     bpy.utils.unregister_class(GetCurrentBranchOperator)
     bpy.utils.unregister_class(CommitItem)
     bpy.utils.unregister_class(BranchItem)
-    bpy.utils.unregister_class(CheckoutItemOperator)
-    bpy.utils.unregister_class(CommitOperator)
+    bpy.utils.unregister_class(RestoreOperator)
+    bpy.utils.unregister_class(CreateCheckpointOperator)
     bpy.utils.unregister_class(RefreshOperator)
     bpy.utils.unregister_class(TimelinePanel)
 
