@@ -182,7 +182,7 @@ class NewBranchOperator(bpy.types.Operator):
 
     def execute(self, _):
         call_new_branch_api(self.name)
-        call_list_branches_operator()
+        run_onload_ops()
         return {'FINISHED'}
 
     def invoke(self, context, event):
