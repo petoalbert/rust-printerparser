@@ -1,4 +1,4 @@
-use parserprinter::db::db_ops::ShortCommitRecord;
+use parserprinter::db::db_ops::{DBError, ShortCommitRecord};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 pub struct ShortCommitRecordWrapper(pub ShortCommitRecord);
 
@@ -12,5 +12,20 @@ impl Serialize for ShortCommitRecordWrapper {
         s.serialize_field("branch", &self.0.branch)?;
         s.serialize_field("message", &self.0.message)?;
         s.end()
+    }
+}
+
+pub struct DBErrorWrapper(pub DBError);
+
+impl Serialize for DBErrorWrapper {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.0 {
+            DBError::Error(ref err) => serializer.serialize_str(err),
+            DBError::Consistency(ref err) => serializer.serialize_str(err),
+            DBError::Fundamental(ref err) => serializer.serialize_str(err),
+        }
     }
 }

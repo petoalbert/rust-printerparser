@@ -4,6 +4,7 @@
 use actix_web::rt::Runtime;
 use server::serve::serve;
 
+mod serde_instances;
 mod server;
 
 fn main() {

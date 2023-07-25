@@ -1,8 +1,8 @@
 #[cfg(test)]
 pub fn init_db(db_path: &str) {
-    use super::init_command::run_init_command;
+    use super::init_command::init_db;
 
-    run_init_command(db_path)
+    init_db(db_path).expect("Cannot init DB")
 }
 
 #[cfg(test)]

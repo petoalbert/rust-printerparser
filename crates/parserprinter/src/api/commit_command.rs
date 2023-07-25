@@ -26,13 +26,14 @@ pub fn create_new_commit(
     db_path: &str,
     message: Option<String>,
 ) -> Result<(), DBError> {
-    let mut conn = Persistence::open(db_path).expect("cannot open DB");
+    let mut conn = Persistence::open(db_path)?;
 
-    check_current_branch_current_commit_set(&conn);
+    check_current_branch_current_commit_set(&conn)?;
 
     let start_commit_command = Instant::now();
     let blend_bytes = measure_time!(format!("Reading {:?}", file_path), {
-        from_file(file_path).map_err(|_| DBError("cannot unpack blend file".to_owned()))
+        from_file(file_path)
+            .map_err(|_| DBError::Fundamental("cannot unpack blend file".to_owned()))
     })?;
 
     let mut parse_state = BlendFileParseState {
@@ -54,23 +55,27 @@ pub fn create_new_commit(
                 let mut state = parse_state.clone();
                 let block_blob = block()
                     .write(parsed_block, &mut state)
-                    .expect("Cannot write block data");
+                    .map_err(|e| DBError::Error(format!("Cannot write block: {:?}", e)))?;
 
                 let hash = md5::compute(&block_blob);
 
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
                 encoder
                     .write_all(&block_blob)
-                    .expect("Cannot compress block");
-                let compressed = encoder.finish().unwrap();
+                    .map_err(|e| DBError::Error(format!("Cannot encode: {:?}", e)))?;
+                let compressed = encoder
+                    .finish()
+                    .map_err(|e| DBError::Error(format!("Cannot encode: {:?}", e)))?;
 
-                BlockRecord {
+                Ok(BlockRecord {
                     hash: format!("{:x}", hash),
                     data: compressed,
-                }
+                })
             })
-            .collect()
-    });
+            .collect::<Vec<Result<BlockRecord, DBError>>>()
+            .into_iter()
+            .collect::<Result<Vec<BlockRecord>, DBError>>()
+    })?;
 
     measure_time!(format!("Writing blocks {:?}", file_path), {
         conn.write_blocks(&block_data[..])?
@@ -94,7 +99,7 @@ pub fn create_new_commit(
 
     let tip = conn
         .read_branch_tip(&current_brach_name)?
-        .ok_or(DBError("Tip not found for branch".to_owned()))?;
+        .ok_or(DBError::Error("Tip not found for branch".to_owned()))?;
 
     let commit_hash = format!("{:x}", blend_hash);
 

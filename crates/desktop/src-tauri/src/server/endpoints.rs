@@ -10,6 +10,8 @@ use parserprinter::api::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::serde_instances::DBErrorWrapper;
+
 #[get("/")]
 pub async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
@@ -44,16 +46,20 @@ struct ShortCommitPayload {
 
 #[get("/checkpoints/{db_path}/{branch}")]
 pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
-    let checkpoints: Vec<ShortCommitPayload> =
-        log_checkpoints(&path.0.to_owned(), Some(path.1.to_owned()))
-            .into_iter()
-            .map(|checkpoint| ShortCommitPayload {
-                hash: checkpoint.hash,
-                message: checkpoint.message,
-            })
-            .collect();
+    let result = log_checkpoints(&path.0.to_owned(), Some(path.1.to_owned()));
 
-    HttpResponse::Ok().json(checkpoints)
+    match result {
+        Ok(checkpoints) => HttpResponse::Ok().json(
+            checkpoints
+                .into_iter()
+                .map(|checkpoint| ShortCommitPayload {
+                    hash: checkpoint.hash,
+                    message: checkpoint.message,
+                })
+                .collect::<Vec<ShortCommitPayload>>(),
+        ),
+        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
+    }
 }
 
 #[derive(Deserialize)]
@@ -76,7 +82,10 @@ pub async fn restore(data: Json<RestorePayload>) -> impl Responder {
 #[get("/branches/{db_path}")]
 pub async fn branches(path: web::Path<(String,)>) -> impl Responder {
     let result = list_braches(&path.0.to_owned());
-    HttpResponse::Ok().json(result)
+    match result {
+        Ok(branches) => HttpResponse::Ok().json(branches),
+        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
+    }
 }
 
 #[derive(Deserialize)]

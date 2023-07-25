@@ -16,17 +16,17 @@ use crate::{
 pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<(), DBError> {
     let end_to_end_timer = Instant::now();
 
-    let mut conn = Persistence::open(db_path).expect("Cannot open DB");
+    let mut conn = Persistence::open(db_path)?;
 
     let commit = measure_time!(format!("Reading commit {:?}", hash), {
         conn.read_commit(hash)?
-            .ok_or(DBError("no such commit found".to_owned()))
+            .ok_or(DBError::Consistency("no such commit found".to_owned()))
     })?;
 
     let block_hashes = measure_time!(format!("Reading blocks {:?}", hash), {
         hash_list()
             .parse(&commit.blocks, &mut ())
-            .map_err(|_| DBError("Cannot parse blocks".to_owned()))?
+            .map_err(|_| DBError::Fundamental("Cannot parse blocks".to_owned()))?
             .1
     });
 
@@ -34,7 +34,7 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
 
     let block_data: Vec<Vec<u8>> = measure_time!(format!("Decompressing blocks {:?}", hash), {
         conn.read_blocks(block_hashes)
-            .map_err(|_| DBError("Cannot read block hashes".to_owned()))?
+            .map_err(|_| DBError::Error("Cannot read block hashes".to_owned()))?
             .par_iter()
             .map(|record| {
                 let mut writer = Vec::new();
@@ -48,7 +48,7 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
 
     measure_time!(format!("Writing file {:?}", hash), {
         to_file_transactional(file_path, header, block_data, b"ENDB".to_vec())
-            .map_err(|_| DBError("Cannot write to file".to_owned()))?;
+            .map_err(|_| DBError::Fundamental("Cannot write to file".to_owned()))?;
     });
 
     conn.execute_in_transaction(|tx| {

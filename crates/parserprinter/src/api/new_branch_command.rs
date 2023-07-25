@@ -1,23 +1,21 @@
-use crate::db::db_ops::{Persistence, DB};
+use crate::db::db_ops::{DBError, Persistence, DB};
 
 use super::invariants::check_current_branch_current_commit_set;
 
-pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), String> {
-    let mut db = Persistence::open(db_path).expect("Cannot open DB");
+pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBError> {
+    let mut db = Persistence::open(db_path)?;
 
-    check_current_branch_current_commit_set(&db);
+    check_current_branch_current_commit_set(&db)?;
 
-    let current_brach_name = db
-        .read_current_branch_name()
-        .expect("Cannot read current branch name");
+    let current_brach_name = db.read_current_branch_name()?;
 
     if current_brach_name != "main" {
-        return Err("New branches can only be created if main is the current branch".to_owned());
+        return Err(DBError::Error(
+            "New branches can only be created if main is the current branch".to_owned(),
+        ));
     }
 
-    let tip = db
-        .read_current_latest_commit()
-        .expect("Cannot read current branch tip");
+    let tip = db.read_current_latest_commit()?;
 
     db.execute_in_transaction(|tx| {
         Persistence::write_branch_tip(tx, new_branch_name, &tip)?;
@@ -26,8 +24,7 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), Str
 
         Persistence::write_current_latest_commit(tx, &tip)?;
         Ok(())
-    })
-    .expect("Cannot update branch data");
+    })?;
 
     Ok(())
 }

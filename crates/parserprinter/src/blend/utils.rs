@@ -2,7 +2,7 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs::File;
-use std::io::{Cursor, Error, Read, Write};
+use std::io::{Cursor, Error, ErrorKind, Read, Write};
 use tempfile::NamedTempFile;
 use zstd::decode_all;
 
@@ -57,9 +57,12 @@ pub fn from_file(path: &str) -> Result<Vec<u8>, Error> {
     file.read_to_end(&mut data)?;
 
     if data[0..7] != *b"BLENDER" {
-        let unzipped = decode_gzip(&data)
-            .or(decode_zstd(&data))
-            .expect("Cannot unzip blend file");
+        let unzipped = decode_gzip(&data).or(decode_zstd(&data)).map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!("Belnd file not correctly encoded: {:?}", e),
+            )
+        })?;
 
         data = unzipped;
     }
