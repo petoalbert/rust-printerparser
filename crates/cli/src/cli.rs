@@ -20,23 +20,6 @@ pub enum Commands {
         to_path: String,
     },
 
-    /// Set username in the DB
-    SetName {
-        /// Path to the blend file DB
-        #[arg(short, long)]
-        db_path: String,
-
-        /// Desired value for `name`
-        value: String,
-    },
-
-    /// Get username from the DB
-    GetName {
-        /// Path to the blend file DB
-        #[arg(short, long)]
-        db_path: String,
-    },
-
     /// Create a checkpoint with the current contents of the file
     Commit {
         /// Path to the blend file DB
