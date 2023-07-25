@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::serde_instances::DBErrorWrapper;
 
-#[get("/")]
-pub async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+#[get("/healthcheck")]
+pub async fn healthcheck() -> impl Responder {
+    HttpResponse::Ok().json("Running")
 }
 
 #[derive(Deserialize)]
@@ -123,7 +123,7 @@ pub async fn switch_branch(data: Json<SwitchBranchPayload>) -> impl Responder {
 pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
     let result = get_current_branch::get_current_branch(&path.0.to_owned());
     match result {
-        Err(_) => HttpResponse::BadRequest().json(""), // TODO
+        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
         Ok(branch) => HttpResponse::Ok().json(branch),
     }
 }

@@ -13,6 +13,8 @@ bl_info = {
 
 URL = 'http://127.0.0.1:8080'
 
+API_NOT_AVAILABLE_ERROR = "Server not running!"
+
 
 def get_file_path():
     return bpy.data.filepath
@@ -22,6 +24,24 @@ def get_db_path(file_path):
     return os.path.join(os.path.dirname(file_path), ".timeline")
 
 
+def call_healthcheck_api():
+    try:
+        requests.get(f"{URL}/healthcheck").raise_for_status()
+        return True
+    except requests.exceptions.RequestException:
+        return None
+
+
+def with_healthcheck(function):
+    def wrapper(*args, **kwargs):
+        running = call_healthcheck_api()
+        if not running:
+            return API_NOT_AVAILABLE_ERROR
+        return function(*args, **kwargs)
+    return wrapper
+
+
+@with_healthcheck
 def call_commit_api(message):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -36,6 +56,7 @@ def call_commit_api(message):
     return requests.post(url, headers=headers, data=json.dumps(data))
 
 
+@with_healthcheck
 def call_checkpoints_api(current_branch):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -45,6 +66,7 @@ def call_checkpoints_api(current_branch):
     return response.json()
 
 
+@with_healthcheck
 def call_restore_api(hash):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -59,6 +81,7 @@ def call_restore_api(hash):
     return requests.post(url, headers=headers, data=json.dumps(data))
 
 
+@with_healthcheck
 def call_new_branch_api(new_branch_name):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -73,6 +96,7 @@ def call_new_branch_api(new_branch_name):
     return requests.post(url, headers=headers, data=json.dumps(data))
 
 
+@with_healthcheck
 def call_list_branches_api():
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -82,6 +106,7 @@ def call_list_branches_api():
     return response.json()
 
 
+@with_healthcheck
 def call_get_current_branch_api():
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -91,6 +116,7 @@ def call_get_current_branch_api():
     return response.json()
 
 
+@with_healthcheck
 def call_switch_branch_api(new_branch_name):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -157,13 +183,16 @@ class ListBranchesOperator(bpy.types.Operator):
     bl_label = "List Branches"
 
     def execute(self, context):
-        branches = call_list_branches_api()
+        response = call_list_branches_api()
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
 
-        self.report({'INFO'}, f"{branches}")
+        self.report({'INFO'}, f"{response}")
 
         bpy.context.scene.branch_items.clear()
 
-        for branch in branches:
+        for branch in response:
             item = bpy.context.scene.branch_items.add()
             item.name = branch
 
@@ -176,8 +205,12 @@ class GetCurrentBranchOperator(bpy.types.Operator):
     bl_label = "Get current branch"
 
     def execute(self, context):
-        current_branch = call_get_current_branch_api()
-        context.scene.current_branch = current_branch
+        response = call_get_current_branch_api()
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        context.scene.current_branch = response
 
         return {'FINISHED'}
 
@@ -192,7 +225,11 @@ class SwitchBranchesOperator(bpy.types.Operator):
     def execute(self, _):
         # TODO: if the file is unsaved, ask the user to confirm
         save_file()
-        call_switch_branch_api(self.name)
+        response = call_switch_branch_api(self.name)
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
         refresh_file()
         run_onload_ops()
         return {'FINISHED'}
@@ -206,7 +243,11 @@ class NewBranchOperator(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Branch name", default="")
 
     def execute(self, _):
-        call_new_branch_api(self.name)
+        response = call_new_branch_api(self.name)
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
         run_onload_ops()
         return {'FINISHED'}
 
@@ -232,7 +273,11 @@ class RestoreOperator(bpy.types.Operator):
 
     def execute(self, _):
         # TODO: if the file is unsaved, ask the user to confirm
-        call_restore_api(self.hash)
+        response = call_restore_api(self.hash)
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
         refresh_file()
         run_onload_ops()
         return {'FINISHED'}
@@ -248,6 +293,10 @@ class CreateCheckpointOperator(bpy.types.Operator):
 
         message = context.scene.commit_message
         response = call_commit_api(message)
+        if response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
         self.report({'INFO'}, f"{response.status_code}")
         run_onload_ops()
         return {'FINISHED'}

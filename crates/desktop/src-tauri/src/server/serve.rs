@@ -1,13 +1,14 @@
 use actix_web::{App, HttpServer};
 
 use super::endpoints::{
-    branches, checkpoints, commit, hello, new_branch, read_current_branch, restore, switch_branch,
+    branches, checkpoints, commit, healthcheck, new_branch, read_current_branch, restore,
+    switch_branch,
 };
 
 pub async fn serve() {
     HttpServer::new(|| {
         App::new()
-            .service(hello)
+            .service(healthcheck)
             .service(commit)
             .service(checkpoints)
             .service(restore)
