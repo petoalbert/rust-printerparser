@@ -8,6 +8,8 @@ mod serde_instances;
 mod server;
 
 fn main() {
+    env_logger::init();
+
     let ctx = tauri::generate_context!();
 
     std::thread::spawn(move || {

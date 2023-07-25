@@ -3,14 +3,27 @@ use actix_web::{
     web::{self, Json},
     HttpResponse, Responder,
 };
-use parserprinter::api::{
-    commit_command::create_new_commit, get_current_branch, list_branches_command::list_braches,
-    log_checkpoints_command::log_checkpoints, new_branch_command::create_new_branch,
-    restore_command::restore_checkpoint, switch_command::switch_branches,
+use log::error;
+use parserprinter::{
+    api::{
+        commit_command::create_new_commit, get_current_branch, init_command::init_db,
+        list_branches_command::list_braches, log_checkpoints_command::log_checkpoints,
+        new_branch_command::create_new_branch, restore_command::restore_checkpoint,
+        switch_command::switch_branches,
+    },
+    db::db_ops::DBError,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::serde_instances::DBErrorWrapper;
+
+fn init_if_not_exists(db_path: &str) -> Result<(), DBError> {
+    let exists = std::path::Path::new(db_path).exists();
+    if !exists {
+        init_db(db_path)?;
+    }
+    Ok(())
+}
 
 #[get("/healthcheck")]
 pub async fn healthcheck() -> impl Responder {
@@ -46,7 +59,10 @@ struct ShortCommitPayload {
 
 #[get("/checkpoints/{db_path}/{branch}")]
 pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
-    let result = log_checkpoints(&path.0.to_owned(), Some(path.1.to_owned()));
+    let (db_path, branch_name) = path.into_inner();
+
+    let result =
+        init_if_not_exists(&db_path).and_then(|_| log_checkpoints(&db_path, Some(branch_name)));
 
     match result {
         Ok(checkpoints) => HttpResponse::Ok().json(
@@ -58,7 +74,10 @@ pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
                 })
                 .collect::<Vec<ShortCommitPayload>>(),
         ),
-        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
+        Err(err) => {
+            error!("{}", err);
+            HttpResponse::BadRequest().json(DBErrorWrapper(err))
+        }
     }
 }
 
@@ -81,10 +100,14 @@ pub async fn restore(data: Json<RestorePayload>) -> impl Responder {
 
 #[get("/branches/{db_path}")]
 pub async fn branches(path: web::Path<(String,)>) -> impl Responder {
-    let result = list_braches(&path.0.to_owned());
+    let (db_path,) = path.into_inner();
+    let result = init_if_not_exists(&db_path).and_then(|_| list_braches(&db_path));
     match result {
         Ok(branches) => HttpResponse::Ok().json(branches),
-        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
+        Err(err) => {
+            error!("{}", err);
+            HttpResponse::BadRequest().json(DBErrorWrapper(err))
+        }
     }
 }
 
@@ -121,9 +144,14 @@ pub async fn switch_branch(data: Json<SwitchBranchPayload>) -> impl Responder {
 
 #[get("/branches/current/{db_path}")]
 pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
-    let result = get_current_branch::get_current_branch(&path.0.to_owned());
+    let (db_path,) = path.into_inner();
+    let result =
+        init_if_not_exists(&db_path).and_then(|_| get_current_branch::get_current_branch(&db_path));
     match result {
-        Err(err) => HttpResponse::BadRequest().json(DBErrorWrapper(err)),
         Ok(branch) => HttpResponse::Ok().json(branch),
+        Err(err) => {
+            error!("{}", err);
+            HttpResponse::BadRequest().json(DBErrorWrapper(err))
+        }
     }
 }

@@ -224,8 +224,6 @@ class ListBranchesOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Cannot list branches")
             return {'FINISHED'}
 
-        self.report({'INFO'}, f"{response}")
-
         bpy.context.scene.branch_items.clear()
 
         for branch in response:
@@ -353,7 +351,6 @@ class CreateCheckpointOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Cannot commit")
             return {'FINISHED'}
 
-        self.report({'INFO'}, f"{response.status_code}")
         run_onload_ops()
         return {'FINISHED'}
 
