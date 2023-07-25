@@ -4,7 +4,7 @@ use super::restore_command::restore_checkpoint;
 
 pub fn switch_branches(db_path: &str, branch_name: &str, file_path: &str) -> Result<(), DBError> {
     let hash = {
-        let db = Persistence::open(db_path).expect("Cannot open db");
+        let mut db = Persistence::open(db_path).expect("Cannot open db");
 
         let tip = db.read_branch_tip(branch_name)?;
 
@@ -14,9 +14,12 @@ pub fn switch_branches(db_path: &str, branch_name: &str, file_path: &str) -> Res
 
         let hash = tip.unwrap();
 
-        db.write_current_branch_name(branch_name)?;
+        db.execute_in_transaction(|tx| {
+            Persistence::write_current_branch_name(tx, branch_name)?;
 
-        db.write_current_latest_commit(&hash)?;
+            Persistence::write_current_latest_commit(tx, &hash)?;
+            Ok(())
+        })?;
 
         hash
     };

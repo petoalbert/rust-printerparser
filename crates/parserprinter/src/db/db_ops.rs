@@ -1,10 +1,8 @@
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
-use crate::{exchange::Exchange, printer_parser::printerparser::PrinterParser};
+use crate::exchange::Exchange;
 
-use super::structs::{hash_list, BlockRecord, Commit};
-
-type Connection = rusqlite::Connection;
+use super::structs::{BlockRecord, Commit};
 
 pub struct ShortCommitRecord {
     pub hash: String,
@@ -24,30 +22,39 @@ pub trait DB: Sized {
     fn open(path: &str) -> Result<Self, DBError>;
 
     fn read_config(&self, key: &str) -> Result<Option<String>, DBError>;
-    fn write_config(&self, key: &str, value: &str) -> Result<(), DBError>;
+    fn write_config(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError>;
 
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError>;
     fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError>;
 
-    fn write_commit(&self, commit: Commit) -> Result<(), DBError>;
+    fn write_commit(tx: &rusqlite::Transaction, commit: Commit) -> Result<(), DBError>;
+    fn write_blocks_str(&self, hash: &str, blocks_str: &str) -> Result<(), DBError>;
     fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
 
     fn read_commits_for_branch(&self, brach_name: &str) -> Result<Vec<ShortCommitRecord>, DBError>;
     fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
 
     fn read_current_branch_name(&self) -> Result<String, DBError>;
-    fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError>;
+    fn write_current_branch_name(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+    ) -> Result<(), DBError>;
 
     fn read_current_latest_commit(&self) -> Result<String, DBError>;
-    fn write_current_latest_commit(&self, hash: &str) -> Result<(), DBError>;
+    fn write_current_latest_commit(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError>;
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
 
     fn read_branch_tip(&self, branch_name: &str) -> Result<Option<String>, DBError>;
-    fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError>;
+    fn write_branch_tip(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+        tip: &str,
+    ) -> Result<(), DBError>;
 
-    fn export_commits(&self, commits: Vec<String>) -> Result<ExportResult, DBError>;
-    fn import_exchange(&self, exchange: Exchange) -> Result<(), DBError>;
+    fn execute_in_transaction<F>(&mut self, f: F) -> Result<(), DBError>
+    where
+        F: FnOnce(&rusqlite::Transaction) -> Result<(), DBError>;
 }
 
 pub struct Persistence {
@@ -75,13 +82,22 @@ fn current_latest_commit_key() -> String {
     "CURRENT_LATEST_COMMIT".to_string()
 }
 
+fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError> {
+    tx.execute(
+        "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
+        [key, value],
+    )
+    .map_err(|_| DBError(format!("Cannot set {:?} for {:?}", value, key)))
+    .map(|_| ())
+}
+
 impl DB for Persistence {
     fn open(path: &str) -> Result<Self, DBError> {
         let sqlite_path = Path::new(path).join("commits.sqlite");
         let rocks_path = Path::new(path).join("blobs.rocks");
 
         let rocks_db = rocksdb::DB::open_default(rocks_path).expect("Cannot open rocksdb");
-        let sqlite_db = Connection::open(sqlite_path).expect("Cannot open sqlite db");
+        let sqlite_db = rusqlite::Connection::open(sqlite_path).expect("Cannot open sqlite db");
 
         sqlite_db
             .execute(
@@ -142,14 +158,8 @@ impl DB for Persistence {
         }
     }
 
-    fn write_config(&self, key: &str, value: &str) -> Result<(), DBError> {
-        self.sqlite_db
-            .execute(
-                "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
-                [key, value],
-            )
-            .map_err(|_| DBError(format!("Cannot set {:?} for {:?}", value, key)))
-            .map(|_| ())
+    fn write_config(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError> {
+        write_config_inner(tx, key, value)
     }
 
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
@@ -179,12 +189,14 @@ impl DB for Persistence {
         Ok(result)
     }
 
-    fn write_commit(&self, commit: Commit) -> Result<(), DBError> {
+    fn write_blocks_str(&self, hash: &str, blocks_str: &str) -> Result<(), DBError> {
         self.rocks_db
-            .put(working_dir_key(&commit.hash), commit.blocks)
-            .expect("Cannot write working dir blocks");
+            .put(working_dir_key(&hash), blocks_str)
+            .map_err(|_| DBError("Cannot write working dir blocks".to_owned()))
+    }
 
-        self.sqlite_db.execute(
+    fn write_commit(tx: &rusqlite::Transaction, commit: Commit) -> Result<(), DBError> {
+        tx.execute(
             "INSERT INTO commits (hash, prev_commit_hash, branch, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             (
                 commit.hash,
@@ -273,8 +285,11 @@ impl DB for Persistence {
             })
     }
 
-    fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError> {
-        self.write_config(&current_branch_name_key(), brach_name)
+    fn write_current_branch_name(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+    ) -> Result<(), DBError> {
+        write_config_inner(tx, &current_branch_name_key(), brach_name)
     }
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError> {
@@ -316,19 +331,22 @@ impl DB for Persistence {
         }
     }
 
-    fn write_branch_tip(&self, brach_name: &str, tip: &str) -> Result<(), DBError> {
-        self.sqlite_db
-            .execute(
-                "INSERT OR REPLACE INTO branches (name, tip) VALUES (?1, ?2)",
-                [&brach_name, &tip],
-            )
-            .map_err(|e| {
-                DBError(format!(
-                    "Cannot create new branch {:?}: {:?}",
-                    brach_name, e
-                ))
-            })
-            .map(|_| ())
+    fn write_branch_tip(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+        tip: &str,
+    ) -> Result<(), DBError> {
+        tx.execute(
+            "INSERT OR REPLACE INTO branches (name, tip) VALUES (?1, ?2)",
+            [&brach_name, &tip],
+        )
+        .map_err(|e| {
+            DBError(format!(
+                "Cannot create new branch {:?}: {:?}",
+                brach_name, e
+            ))
+        })
+        .map(|_| ())
     }
 
     fn read_current_latest_commit(&self) -> Result<String, DBError> {
@@ -342,74 +360,23 @@ impl DB for Persistence {
             })
     }
 
-    fn write_current_latest_commit(&self, hash: &str) -> Result<(), DBError> {
-        self.write_config(&current_latest_commit_key(), hash)
+    fn write_current_latest_commit(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError> {
+        write_config_inner(tx, &current_latest_commit_key(), hash)
             .map_err(|e| DBError(format!("Cannot write latest commit hash: {:?}", e)))
     }
 
-    fn export_commits(&self, hashes: Vec<String>) -> Result<ExportResult, DBError> {
-        let mut blobs: HashMap<String, Vec<u8>> = HashMap::new();
-        let mut commits: Vec<Commit> = vec![];
-        let mut skipped: Vec<String> = vec![];
+    fn execute_in_transaction<F>(&mut self, f: F) -> Result<(), DBError>
+    where
+        F: FnOnce(&rusqlite::Transaction) -> Result<(), DBError>,
+    {
+        let tx = self
+            .sqlite_db
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .map_err(|_| DBError("Cannot create transaction".to_owned()))?;
 
-        for hash in hashes {
-            let commit = self.read_commit(&hash)?;
-            if let Some(commit) = commit {
-                let hashes = hash_list()
-                    .parse(&commit.blocks, &mut ())
-                    .map_err(|_| DBError("Cannot parse blocks".to_owned()))?
-                    .1;
+        f(&tx)?;
 
-                commits.push(commit);
-
-                let blocks = self.read_blocks(hashes)?;
-
-                for block in blocks {
-                    blobs.insert(block.hash, block.data);
-                }
-            } else {
-                skipped.push(hash)
-            }
-        }
-
-        let blocks: Vec<BlockRecord> = blobs
-            .into_iter()
-            .map(|(hash, data)| BlockRecord { hash, data })
-            .collect();
-
-        Ok(ExportResult {
-            exchange: Exchange { commits, blocks },
-            skipped,
-        })
-    }
-
-    fn import_exchange(&self, exchange: Exchange) -> Result<(), DBError> {
-        let mut new_branches: HashMap<String, (u64, String)> = HashMap::new();
-        for commit in exchange.commits {
-            let commit_hash = commit.hash.clone();
-            let commit_date = commit.date;
-            let commit_branch = commit.branch.clone();
-
-            self.write_commit(commit)?;
-
-            let latest = new_branches.get(&commit_branch);
-            match latest {
-                None => {
-                    new_branches.insert(commit_branch, (commit_date, commit_hash));
-                }
-                Some((date, _)) if commit_date > (*date) => {
-                    new_branches.insert(commit_branch, (commit_date, commit_hash));
-                }
-                _ => {}
-            }
-        }
-
-        for (branch, (_, tip)) in new_branches {
-            self.write_branch_tip(&branch, &tip)?;
-        }
-
-        self.write_blocks(&exchange.blocks)?;
-
-        Ok(())
+        tx.commit()
+            .map_err(|_| DBError("Cannot commit transaction".to_owned()))
     }
 }
