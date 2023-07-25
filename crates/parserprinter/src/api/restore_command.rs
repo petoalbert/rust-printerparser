@@ -16,7 +16,7 @@ use crate::{
 pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<(), DBError> {
     let end_to_end_timer = Instant::now();
 
-    let conn = Persistence::open(db_path).expect("Cannot open DB");
+    let mut conn = Persistence::open(db_path).expect("Cannot open DB");
 
     let commit = measure_time!(format!("Reading commit {:?}", hash), {
         conn.read_commit(hash)?
@@ -51,9 +51,11 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
             .map_err(|_| DBError("Cannot write to file".to_owned()))?;
     });
 
-    conn.write_current_branch_name(&commit.branch)?;
-
-    conn.write_current_latest_commit(&commit.hash)?;
+    conn.execute_in_transaction(|tx| {
+        Persistence::write_current_branch_name(tx, &commit.branch)?;
+        Persistence::write_current_latest_commit(tx, &commit.hash)?;
+        Ok(())
+    })?;
 
     println!("Checkout took: {:?}", end_to_end_timer.elapsed());
 

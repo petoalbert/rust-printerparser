@@ -26,7 +26,7 @@ pub fn create_new_commit(
     db_path: &str,
     message: Option<String>,
 ) -> Result<(), DBError> {
-    let conn = Persistence::open(db_path).expect("cannot open DB");
+    let mut conn = Persistence::open(db_path).expect("cannot open DB");
 
     check_current_branch_current_commit_set(&conn);
 
@@ -98,22 +98,27 @@ pub fn create_new_commit(
 
     let commit_hash = format!("{:x}", blend_hash);
 
-    conn.write_branch_tip(&current_brach_name, &commit_hash)?;
+    conn.write_blocks_str(&commit_hash, &blocks_str)?;
 
-    conn.write_current_latest_commit(&commit_hash)?;
+    conn.execute_in_transaction(|tx| {
+        Persistence::write_branch_tip(tx, &current_brach_name, &commit_hash)?;
 
-    let commit = Commit {
-        hash: commit_hash,
-        prev_commit_hash: tip,
-        branch: current_brach_name,
-        message: message.unwrap_or_default(),
-        author: name,
-        date: timestamp(),
-        header: header_bytes,
-        blocks: blocks_str,
-    };
+        Persistence::write_current_latest_commit(tx, &commit_hash)?;
 
-    conn.write_commit(commit).expect("cannot write commit");
+        let commit = Commit {
+            hash: commit_hash,
+            prev_commit_hash: tip,
+            branch: current_brach_name,
+            message: message.unwrap_or_default(),
+            author: name,
+            date: timestamp(),
+            header: header_bytes,
+            blocks: blocks_str,
+        };
+
+        Persistence::write_commit(tx, commit)
+    })?;
+
     println!("Committing took {:?}", start_commit_command.elapsed());
     Ok(())
 }

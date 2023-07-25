@@ -1,8 +1,8 @@
 use crate::db::db_ops::{Persistence, DB};
 
 pub fn run_set_name_command(db_path: String, value: String) {
-    let conn = Persistence::open(&db_path).expect("Cannot open DB");
-    conn.write_config("name", &value)
+    let mut conn = Persistence::open(&db_path).expect("Cannot open DB");
+    conn.execute_in_transaction(|tx| Persistence::write_config(tx, "name", &value))
         .expect("Couldn't write name")
 }
 

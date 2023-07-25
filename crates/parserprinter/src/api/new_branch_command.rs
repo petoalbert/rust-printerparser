@@ -3,7 +3,7 @@ use crate::db::db_ops::{Persistence, DB};
 use super::invariants::check_current_branch_current_commit_set;
 
 pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), String> {
-    let db = Persistence::open(db_path).expect("Cannot open DB");
+    let mut db = Persistence::open(db_path).expect("Cannot open DB");
 
     check_current_branch_current_commit_set(&db);
 
@@ -19,14 +19,15 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), Str
         .read_current_latest_commit()
         .expect("Cannot read current branch tip");
 
-    db.write_branch_tip(new_branch_name, &tip)
-        .expect("Cannot create new branch");
+    db.execute_in_transaction(|tx| {
+        Persistence::write_branch_tip(tx, new_branch_name, &tip)?;
 
-    db.write_current_branch_name(new_branch_name)
-        .expect("Cannot set current branch name");
+        Persistence::write_current_branch_name(tx, new_branch_name)?;
 
-    db.write_current_latest_commit(&tip)
-        .expect("Cannot set new branch name");
+        Persistence::write_current_latest_commit(tx, &tip)?;
+        Ok(())
+    })
+    .expect("Cannot update branch data");
 
     Ok(())
 }
