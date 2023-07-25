@@ -42,7 +42,8 @@ mod test {
 
         test_utils::init_db(tmp_db_path);
 
-        switch_branches(tmp_db_path, "unknown", "void.blend").expect("Cannotttt switch branches");
+        let res = switch_branches(tmp_db_path, "unknown", "void.blend");
+        assert!(matches!(res, Err(_)));
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
         assert_eq!(db.read_all_commits().unwrap().len(), 0);
