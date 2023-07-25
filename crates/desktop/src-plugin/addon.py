@@ -192,7 +192,7 @@ class NewBranchOperator(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-class CommitItem(bpy.types.PropertyGroup):
+class CheckpointItem(bpy.types.PropertyGroup):
     message: bpy.props.StringProperty(name="Message", default="")
     hash: bpy.props.StringProperty(name="Hash", default="")
 
@@ -279,14 +279,14 @@ def register():
     bpy.utils.register_class(SwitchBranchesOperator)
     bpy.utils.register_class(NewBranchOperator)
     bpy.utils.register_class(GetCurrentBranchOperator)
-    bpy.utils.register_class(CommitItem)
+    bpy.utils.register_class(CheckpointItem)
     bpy.utils.register_class(BranchItem)
     bpy.utils.register_class(RestoreOperator)
     bpy.utils.register_class(CreateCheckpointOperator)
     bpy.utils.register_class(RefreshOperator)
     bpy.utils.register_class(TimelinePanel)
 
-    bpy.types.Scene.checkpoint_items = bpy.props.CollectionProperty(type=CommitItem)
+    bpy.types.Scene.checkpoint_items = bpy.props.CollectionProperty(type=CheckpointItem)
     bpy.types.Scene.branch_items = bpy.props.CollectionProperty(type=BranchItem)
     bpy.types.Scene.current_branch = bpy.props.StringProperty(name="")
     bpy.types.Scene.commit_message = bpy.props.StringProperty(name="", options={'TEXTEDIT_UPDATE'})
@@ -299,7 +299,7 @@ def unregister():
     bpy.utils.unregister_class(SwitchBranchesOperator)
     bpy.utils.unregister_class(NewBranchOperator)
     bpy.utils.unregister_class(GetCurrentBranchOperator)
-    bpy.utils.unregister_class(CommitItem)
+    bpy.utils.unregister_class(CheckpointItem)
     bpy.utils.unregister_class(BranchItem)
     bpy.utils.unregister_class(RestoreOperator)
     bpy.utils.unregister_class(CreateCheckpointOperator)
