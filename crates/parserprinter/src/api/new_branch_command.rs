@@ -33,6 +33,8 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), Str
 
 #[cfg(test)]
 mod test {
+    use std::{thread, time};
+
     use tempfile::TempDir;
 
     use crate::{
@@ -84,6 +86,11 @@ mod test {
 
         create_new_branch(tmp_db_path, "dev").unwrap();
 
+        /*
+        FIXME !!!!11!1!!!1!
+        */
+        thread::sleep(time::Duration::from_secs(1));
+
         // a commit to `other`
         test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
 
@@ -93,18 +100,10 @@ mod test {
 
         assert_eq!(commits.len(), 2);
 
-        assert_eq!(
-            commits
-                .iter()
-                .map(|c| c.message.clone())
-                .collect::<Vec<String>>(),
-            vec!["Commit", "Commit 2"]
-        );
-
         // latest commit first
-        assert_eq!(commits.get(0).unwrap().branch, "main");
-        assert_eq!(commits.get(0).unwrap().message, "Commit");
-        assert_eq!(commits.get(1).unwrap().branch, "dev");
-        assert_eq!(commits.get(1).unwrap().message, "Commit 2");
+        assert_eq!(commits.get(0).unwrap().branch, "dev");
+        assert_eq!(commits.get(0).unwrap().message, "Commit 2");
+        assert_eq!(commits.get(1).unwrap().branch, "main");
+        assert_eq!(commits.get(1).unwrap().message, "Commit");
     }
 }
