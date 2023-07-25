@@ -36,7 +36,7 @@ def with_healthcheck(function):
     def wrapper(*args, **kwargs):
         running = call_healthcheck_api()
         if not running:
-            return API_NOT_AVAILABLE_ERROR
+            return (False, API_NOT_AVAILABLE_ERROR)
         return function(*args, **kwargs)
     return wrapper
 
@@ -53,7 +53,11 @@ def call_commit_api(message):
         'message': message,
     }
 
-    return requests.post(url, headers=headers, data=json.dumps(data))
+    try:
+        requests.post(url, headers=headers, data=json.dumps(data))
+        return (True, None)
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 @with_healthcheck
@@ -62,8 +66,11 @@ def call_checkpoints_api(current_branch):
     db_path = get_db_path(file_path)
     url = f'{URL}/checkpoints/{quote_plus(db_path)}/{quote_plus(current_branch)}'
 
-    response = requests.get(url)
-    return response.json()
+    try:
+        response = requests.get(url)
+        return (True, response.json())
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 @with_healthcheck
@@ -78,7 +85,11 @@ def call_restore_api(hash):
         'hash': hash,
     }
 
-    return requests.post(url, headers=headers, data=json.dumps(data))
+    try:
+        requests.post(url, headers=headers, data=json.dumps(data))
+        return (True, None)
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 @with_healthcheck
@@ -93,7 +104,11 @@ def call_new_branch_api(new_branch_name):
         'branch_name': new_branch_name,
     }
 
-    return requests.post(url, headers=headers, data=json.dumps(data))
+    try:
+        requests.post(url, headers=headers, data=json.dumps(data))
+        return (True, None)
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 @with_healthcheck
@@ -102,8 +117,11 @@ def call_list_branches_api():
     db_path = get_db_path(file_path)
     url = f'{URL}/branches/{quote_plus(db_path)}'
 
-    response = requests.get(url)
-    return response.json()
+    try:
+        response = requests.get(url)
+        return (True, response.json())
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 @with_healthcheck
@@ -112,8 +130,11 @@ def call_get_current_branch_api():
     db_path = get_db_path(file_path)
     url = f'{URL}/branches/current/{quote_plus(db_path)}'
 
-    response = requests.get(url)
-    return response.json()
+    try:
+        response = requests.get(url)
+        return (True, response.json())
+    except:
+        return (False, None)
 
 
 @with_healthcheck
@@ -128,7 +149,11 @@ def call_switch_branch_api(new_branch_name):
         'branch_name': new_branch_name,
     }
 
-    return requests.post(url, headers=headers, data=json.dumps(data))
+    try:
+        requests.post(url, headers=headers, data=json.dumps(data))
+        return (True, None)
+    except requests.exceptions.RequestException:
+        return (False, None)
 
 
 def call_list_branches_operator():
@@ -165,11 +190,18 @@ class ListCheckpointsOperator(bpy.types.Operator):
 
     def execute(self, context):
         current_branch = context.scene.current_branch if context.scene.current_branch != None else "main"
-        items = call_checkpoints_api(current_branch)
+        (success, result) = call_checkpoints_api(current_branch)
+        if not success and result == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot list checkpoints")
+            return {'FINISHED'}
 
         bpy.context.scene.checkpoint_items.clear()
 
-        for i in items:
+        for i in result:
             item = bpy.context.scene.checkpoint_items.add()
             item.hash = i['hash']
             item.message = i['message']
@@ -183,9 +215,13 @@ class ListBranchesOperator(bpy.types.Operator):
     bl_label = "List Branches"
 
     def execute(self, context):
-        response = call_list_branches_api()
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_list_branches_api()
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot list branches")
             return {'FINISHED'}
 
         self.report({'INFO'}, f"{response}")
@@ -205,9 +241,13 @@ class GetCurrentBranchOperator(bpy.types.Operator):
     bl_label = "Get current branch"
 
     def execute(self, context):
-        response = call_get_current_branch_api()
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_get_current_branch_api()
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot get current branch")
             return {'FINISHED'}
 
         context.scene.current_branch = response
@@ -225,9 +265,13 @@ class SwitchBranchesOperator(bpy.types.Operator):
     def execute(self, _):
         # TODO: if the file is unsaved, ask the user to confirm
         save_file()
-        response = call_switch_branch_api(self.name)
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_switch_branch_api(self.name)
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot switch branch")
             return {'FINISHED'}
 
         refresh_file()
@@ -243,9 +287,13 @@ class NewBranchOperator(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Branch name", default="")
 
     def execute(self, _):
-        response = call_new_branch_api(self.name)
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_new_branch_api(self.name)
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot create new branch")
             return {'FINISHED'}
 
         run_onload_ops()
@@ -273,9 +321,13 @@ class RestoreOperator(bpy.types.Operator):
 
     def execute(self, _):
         # TODO: if the file is unsaved, ask the user to confirm
-        response = call_restore_api(self.hash)
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_restore_api(self.hash)
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot restore checkpoint")
             return {'FINISHED'}
 
         refresh_file()
@@ -292,9 +344,13 @@ class CreateCheckpointOperator(bpy.types.Operator):
         save_file()
 
         message = context.scene.commit_message
-        response = call_commit_api(message)
-        if response == API_NOT_AVAILABLE_ERROR:
+        (success, response) = call_commit_api(message)
+        if not success and response == API_NOT_AVAILABLE_ERROR:
             self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report({'ERROR'}, "Cannot commit")
             return {'FINISHED'}
 
         self.report({'INFO'}, f"{response.status_code}")
