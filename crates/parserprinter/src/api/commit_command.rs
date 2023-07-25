@@ -2,7 +2,7 @@ use flate2::{write::GzEncoder, Compression};
 use rayon::prelude::*;
 
 use crate::{
-    api::invariants::{check_current_branch_current_commit_set, check_no_detached_head_invariant},
+    api::invariants::check_current_branch_current_commit_set,
     blend::{
         blend_file::{Endianness, PointerSize},
         parsers::{blend, block, header as pheader, BlendFileParseState},
@@ -29,7 +29,6 @@ pub fn create_new_commit(
     let conn = Persistence::open(db_path).expect("cannot open DB");
 
     check_current_branch_current_commit_set(&conn);
-    check_no_detached_head_invariant(&conn);
 
     let start_commit_command = Instant::now();
     let blend_bytes = measure_time!(format!("Reading {:?}", file_path), {
