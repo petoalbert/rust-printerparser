@@ -940,6 +940,8 @@ name = "desktop"
 version = "0.0.0"
 dependencies = [
  "actix-web",
+ "env_logger",
+ "log",
  "parserprinter",
  "serde",
  "serde_json",
