@@ -56,11 +56,6 @@ pub struct Persistence {
 }
 
 #[inline]
-fn config_key(key: &str) -> String {
-    format!("config-{:?}", key)
-}
-
-#[inline]
 fn block_hash_key(key: &str) -> String {
     format!("block-hash-{:?}", key)
 }
@@ -113,6 +108,16 @@ impl DB for Persistence {
             )
             .expect("Cannot create branches table");
 
+        sqlite_db
+            .execute(
+                "CREATE TABLE IF NOT EXISTS config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )",
+                [],
+            )
+            .expect("Cannot create config table");
+
         Ok(Self {
             rocks_db,
             sqlite_db,
@@ -120,16 +125,31 @@ impl DB for Persistence {
     }
 
     fn read_config(&self, key: &str) -> Result<Option<String>, DBError> {
-        self.rocks_db
-            .get(config_key(key))
-            .map_err(|_| DBError(format!("Cannot get value for {:?}", key)))
-            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))
+        let mut stmt = self
+            .sqlite_db
+            .prepare("SELECT value FROM config WHERE key = ?1")
+            .map_err(|_| DBError("Cannot prepare read commits query".to_owned()))?;
+
+        let mut rows = stmt
+            .query([key])
+            .map_err(|_| DBError("Cannot query config table".to_owned()))?;
+
+        match rows.next() {
+            Ok(Some(row)) => row
+                .get(0)
+                .map_err(|_| DBError("Cannot read config key".to_owned())),
+            _ => Ok(None),
+        }
     }
 
     fn write_config(&self, key: &str, value: &str) -> Result<(), DBError> {
-        self.rocks_db
-            .put(config_key(key), value)
-            .map_err(|_| DBError(format!("Cannot get value for {:?}", key)))
+        self.sqlite_db
+            .execute(
+                "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
+                [key, value],
+            )
+            .map_err(|_| DBError(format!("Cannot set {:?} for {:?}", value, key)))
+            .map(|_| ())
     }
 
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
@@ -243,17 +263,18 @@ impl DB for Persistence {
     }
 
     fn read_current_branch_name(&self) -> Result<String, DBError> {
-        self.rocks_db
-            .get(current_branch_name_key())
+        self.read_config(&current_branch_name_key())
             .map_err(|_| DBError("Cannot read current branch name".to_owned()))
-            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))?
-            .ok_or(DBError("Current branch name not set".to_owned()))
+            .and_then(|v| {
+                v.map_or(
+                    Err(DBError("Cannot read current branch name".to_owned())),
+                    Ok,
+                )
+            })
     }
 
     fn write_current_branch_name(&self, brach_name: &str) -> Result<(), DBError> {
-        self.rocks_db
-            .put(current_branch_name_key(), brach_name)
-            .map_err(|_| DBError("Cannot write branch name".to_owned()))
+        self.write_config(&current_branch_name_key(), brach_name)
     }
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError> {
@@ -311,17 +332,19 @@ impl DB for Persistence {
     }
 
     fn read_current_latest_commit(&self) -> Result<String, DBError> {
-        self.rocks_db
-            .get(current_latest_commit_key())
+        self.read_config(&current_latest_commit_key())
             .map_err(|_| DBError("Cannot read latest commit hash".to_owned()))
-            .map(|res| res.map(|bs| String::from_utf8(bs).unwrap()))?
-            .ok_or(DBError("Latest commit hash not set".to_owned()))
+            .and_then(|v| {
+                v.map_or(
+                    Err(DBError("Cannot read latest commit hash".to_owned())),
+                    Ok,
+                )
+            })
     }
 
     fn write_current_latest_commit(&self, hash: &str) -> Result<(), DBError> {
-        self.rocks_db
-            .put(current_latest_commit_key(), hash)
-            .map_err(|e| DBError(format!("Cannot get latest commit hash: {:?}", e)))
+        self.write_config(&current_latest_commit_key(), hash)
+            .map_err(|e| DBError(format!("Cannot write latest commit hash: {:?}", e)))
     }
 
     fn export_commits(&self, hashes: Vec<String>) -> Result<ExportResult, DBError> {
