@@ -19,3 +19,13 @@ pub fn new_branch(db_path: &str, name: &str) {
 
     create_new_branch(db_path, name).expect("Cannot create new branch")
 }
+
+#[cfg(test)]
+use crate::db::db_ops::ShortCommitRecord;
+
+#[cfg(test)]
+pub fn list_checkpoints(db_path: &str, branch: &str) -> Vec<ShortCommitRecord> {
+    use super::log_checkpoints_command;
+
+    log_checkpoints_command::list_checkpoints(db_path, branch).expect("Cannot list checkpoints")
+}

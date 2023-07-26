@@ -7,7 +7,7 @@ use log::error;
 use parserprinter::{
     api::{
         commit_command::create_new_commit, get_current_branch, init_command::init_db,
-        list_branches_command::list_braches, log_checkpoints_command::log_checkpoints,
+        list_branches_command::list_braches, log_checkpoints_command::list_checkpoints,
         new_branch_command::create_new_branch, restore_command::restore_checkpoint,
         switch_command::switch_branches,
     },
@@ -65,7 +65,7 @@ pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
     let (db_path, branch_name) = path.into_inner();
 
     let result =
-        init_if_not_exists(&db_path).and_then(|_| log_checkpoints(&db_path, Some(branch_name)));
+        init_if_not_exists(&db_path).and_then(|_| list_checkpoints(&db_path, &branch_name));
 
     match result {
         Ok(checkpoints) => HttpResponse::Ok().json(

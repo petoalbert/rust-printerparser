@@ -7,7 +7,7 @@ use parserprinter::{
     api::{
         commit_command::create_new_commit, get_current_branch::get_current_branch,
         init_command::init_db, list_branches_command::list_braches,
-        log_checkpoints_command::log_checkpoints, new_branch_command::create_new_branch,
+        log_checkpoints_command::list_checkpoints, new_branch_command::create_new_branch,
         restore_command::restore_checkpoint, switch_command::switch_branches,
         test_command::run_command_test,
     },
@@ -31,8 +31,8 @@ fn print_all_branches(db_path: &str) {
     }
 }
 
-fn print_checkpoints(db_path: &str, branch_name: Option<String>) {
-    let result = log_checkpoints(db_path, branch_name);
+fn print_checkpoints(db_path: &str, branch_name: &str) {
+    let result = list_checkpoints(db_path, branch_name);
     match result {
         Ok(checkpoints) => checkpoints
             .into_iter()
@@ -95,7 +95,7 @@ fn main() {
             branch,
             file_path,
         } => run_switch_branches(&db_path, &file_path, &branch),
-        Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, branch),
+        Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, &branch),
         Commands::Init { db_path } => run_init_command(&db_path),
     }
 }

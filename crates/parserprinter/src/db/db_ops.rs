@@ -45,8 +45,8 @@ pub trait DB: Sized {
     fn write_blocks_str(&self, hash: &str, blocks_str: &str) -> Result<(), DBError>;
     fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
 
-    fn read_commits_for_branch(&self, brach_name: &str) -> Result<Vec<ShortCommitRecord>, DBError>;
-    fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError>;
+    fn read_ancestors_of_commit(&self, brach_name: &str)
+        -> Result<Vec<ShortCommitRecord>, DBError>;
 
     fn read_current_branch_name(&self) -> Result<String, DBError>;
     fn write_current_branch_name(
@@ -250,42 +250,29 @@ impl DB for Persistence {
         }))).map_err(|e| DBError::Error(format!("Cannot read commit: {:?}", e)))
     }
 
-    fn read_all_commits(&self) -> Result<Vec<ShortCommitRecord>, DBError> {
-        let mut stmt = self
-            .sqlite_db
-            .prepare("SELECT hash, branch, message FROM commits ORDER BY date DESC")
-            .map_err(|e| {
-                DBError::Fundamental(format!("Cannot prepare read commits query: {:?}", e))
-            })?;
-
-        let mut rows = stmt
-            .query([])
-            .map_err(|e| DBError::Error(format!("Cannot read commits: {:?}", e)))?;
-
-        let mut result: Vec<ShortCommitRecord> = vec![];
-        while let Ok(Some(data)) = rows.next() {
-            result.push(ShortCommitRecord {
-                hash: data.get(0).expect("cannot get hash"),
-                branch: data.get(1).expect("cannot get branch"),
-                message: data.get(2).expect("cannot read message"),
-            })
-        }
-
-        Ok(result)
-    }
-
-    fn read_commits_for_branch(&self, brach_name: &str) -> Result<Vec<ShortCommitRecord>, DBError> {
+    fn read_ancestors_of_commit(
+        &self,
+        starting_from_hash: &str,
+    ) -> Result<Vec<ShortCommitRecord>, DBError> {
         let mut stmt = self
             .sqlite_db
             .prepare(
-                "SELECT hash, branch, message FROM commits WHERE branch = ?1 ORDER BY date DESC",
+                "
+                WITH RECURSIVE ancestor_commits(hash, branch, message, prev_commit_hash, date) AS (
+                    SELECT hash, branch, message, prev_commit_hash, date FROM commits WHERE hash = ?1
+                    UNION ALL
+                    SELECT c.hash, c.branch, c.message, c.prev_commit_hash, c.date FROM commits c
+                    JOIN ancestor_commits a ON a.prev_commit_hash = c.hash
+                )
+                SELECT hash, branch, message FROM ancestor_commits ORDER BY date DESC;
+                ",
             )
             .map_err(|e| {
                 DBError::Fundamental(format!("Cannot prepare read commits query: {:?}", e))
             })?;
 
         let mut rows = stmt
-            .query([brach_name])
+            .query([starting_from_hash])
             .map_err(|e| DBError::Error(format!("Cannot read commits: {:?}", e)))?;
 
         let mut result: Vec<ShortCommitRecord> = vec![];

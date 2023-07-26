@@ -98,7 +98,7 @@ pub enum Commands {
 
         /// Optional: name of the branch to log checkpoints for
         #[arg(short, long)]
-        branch: Option<String>,
+        branch: String,
     },
 
     /// Initialize the DB

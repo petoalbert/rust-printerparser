@@ -92,10 +92,10 @@ mod test {
         )
         .expect("Cannot restore checkpoint");
 
-        let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
-
         // Number of commits stays the same
-        assert_eq!(db.read_all_commits().unwrap().len(), 2);
+        assert_eq!(test_utils::list_checkpoints(tmp_db_path, "main").len(), 2);
+
+        let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
         let current_branch_name = db
             .read_current_branch_name()

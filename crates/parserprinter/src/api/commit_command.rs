@@ -97,9 +97,7 @@ pub fn create_new_commit(
 
     let current_brach_name = conn.read_current_branch_name()?;
 
-    let tip = conn
-        .read_branch_tip(&current_brach_name)?
-        .ok_or(DBError::Error("Tip not found for branch".to_owned()))?;
+    let latest_commit = conn.read_current_latest_commit()?;
 
     let commit_hash = format!("{:x}", blend_hash);
 
@@ -112,7 +110,7 @@ pub fn create_new_commit(
 
         let commit = Commit {
             hash: commit_hash,
-            prev_commit_hash: tip,
+            prev_commit_hash: latest_commit,
             branch: current_brach_name,
             message: message.unwrap_or_default(),
             author: name,
@@ -155,10 +153,10 @@ mod test {
 
         create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
 
-        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
-
         // Creates exactly one commit
-        assert_eq!(db.read_all_commits().unwrap().len(), 1);
+        assert_eq!(test_utils::list_checkpoints(tmp_path, "main").len(), 1);
+
+        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
         let commit = db
             .read_commit("a5f92d0a988085ed66c9dcdccc7b9c90")
@@ -208,9 +206,9 @@ mod test {
         )
         .unwrap();
 
-        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
+        assert_eq!(test_utils::list_checkpoints(tmp_path, "main").len(), 2);
 
-        assert_eq!(db.read_all_commits().unwrap().len(), 2);
+        let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
         let current_branch_name = db
             .read_current_branch_name()

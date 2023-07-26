@@ -31,8 +31,6 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBE
 
 #[cfg(test)]
 mod test {
-    use std::{thread, time};
-
     use tempfile::TempDir;
 
     use crate::{
@@ -51,8 +49,9 @@ mod test {
 
         create_new_branch(tmp_db_path, "dev").unwrap();
 
+        assert_eq!(test_utils::list_checkpoints(tmp_db_path, "dev").len(), 0);
+
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
-        assert_eq!(db.read_all_commits().unwrap().len(), 0);
 
         let current_branch_name = db
             .read_current_branch_name()
@@ -84,17 +83,10 @@ mod test {
 
         create_new_branch(tmp_db_path, "dev").unwrap();
 
-        /*
-        FIXME !!!!11!1!!!1!
-        */
-        thread::sleep(time::Duration::from_secs(1));
-
         // a commit to `other`
         test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
 
-        let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
-
-        let commits = db.read_all_commits().unwrap();
+        let commits = test_utils::list_checkpoints(tmp_db_path, "dev");
 
         assert_eq!(commits.len(), 2);
 

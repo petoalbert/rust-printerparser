@@ -51,7 +51,6 @@ mod test {
         assert!(matches!(res, Err(_)));
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
-        assert_eq!(db.read_all_commits().unwrap().len(), 0);
 
         let branches = db.read_all_branches().unwrap();
 

@@ -1,14 +1,15 @@
 use crate::db::db_ops::{DBError, Persistence, ShortCommitRecord, DB};
 
-pub fn log_checkpoints(
+pub fn list_checkpoints(
     db_path: &str,
-    branch_name: Option<String>,
+    branch_name: &str,
 ) -> Result<Vec<ShortCommitRecord>, DBError> {
     let conn = Persistence::open(db_path)?;
-
-    if let Some(branch) = branch_name {
-        conn.read_commits_for_branch(&branch)
-    } else {
-        conn.read_all_commits()
-    }
+    let tip = conn
+        .read_branch_tip(branch_name)?
+        .ok_or(DBError::Consistency(format!(
+            "Cannot read tip for branch {}",
+            branch_name
+        )))?;
+    conn.read_ancestors_of_commit(&tip)
 }
