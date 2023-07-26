@@ -183,6 +183,14 @@ def refresh_file():
     bpy.ops.wm.revert_mainfile()
 
 
+class WaitCursor():
+    def __enter__(self):
+        bpy.context.window.cursor_set("WAIT")
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+
 class ListCheckpointsOperator(bpy.types.Operator):
     """List checkpoints for this branch"""
     bl_idname = "wm.list_checkpoints_operator"
@@ -261,20 +269,21 @@ class SwitchBranchesOperator(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Branch name", default="")
 
     def execute(self, _):
-        # TODO: if the file is unsaved, ask the user to confirm
-        save_file()
-        (success, response) = call_switch_branch_api(self.name)
-        if not success and response == API_NOT_AVAILABLE_ERROR:
-            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
-            return {'FINISHED'}
+        with WaitCursor():
+            # TODO: if the file is unsaved, ask the user to confirm
+            save_file()
+            (success, response) = call_switch_branch_api(self.name)
+            if not success and response == API_NOT_AVAILABLE_ERROR:
+                self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+                return {'FINISHED'}
 
-        if not success:
-            self.report({'ERROR'}, "Cannot switch branch")
-            return {'FINISHED'}
+            if not success:
+                self.report({'ERROR'}, "Cannot switch branch")
+                return {'FINISHED'}
 
-        refresh_file()
-        run_onload_ops()
-        return {'FINISHED'}
+            refresh_file()
+            run_onload_ops()
+            return {'FINISHED'}
 
 
 class NewBranchOperator(bpy.types.Operator):
@@ -285,17 +294,18 @@ class NewBranchOperator(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Branch name", default="")
 
     def execute(self, _):
-        (success, response) = call_new_branch_api(self.name)
-        if not success and response == API_NOT_AVAILABLE_ERROR:
-            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
-            return {'FINISHED'}
+        with WaitCursor():
+            (success, response) = call_new_branch_api(self.name)
+            if not success and response == API_NOT_AVAILABLE_ERROR:
+                self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+                return {'FINISHED'}
 
-        if not success:
-            self.report({'ERROR'}, "Cannot create new branch")
-            return {'FINISHED'}
+            if not success:
+                self.report({'ERROR'}, "Cannot create new branch")
+                return {'FINISHED'}
 
-        run_onload_ops()
-        return {'FINISHED'}
+            run_onload_ops()
+            return {'FINISHED'}
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
@@ -317,20 +327,21 @@ class RestoreOperator(bpy.types.Operator):
 
     hash: bpy.props.StringProperty(name="Hash", default="")
 
-    def execute(self, _):
-        # TODO: if the file is unsaved, ask the user to confirm
-        (success, response) = call_restore_api(self.hash)
-        if not success and response == API_NOT_AVAILABLE_ERROR:
-            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
-            return {'FINISHED'}
+    def execute(self, context):
+        with WaitCursor():
+            # TODO: if the file is unsaved, ask the user to confirm
+            (success, response) = call_restore_api(self.hash)
+            if not success and response == API_NOT_AVAILABLE_ERROR:
+                self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+                return {'FINISHED'}
 
-        if not success:
-            self.report({'ERROR'}, "Cannot restore checkpoint")
-            return {'FINISHED'}
+            if not success:
+                self.report({'ERROR'}, "Cannot restore checkpoint")
+                return {'FINISHED'}
 
-        refresh_file()
-        run_onload_ops()
-        return {'FINISHED'}
+            refresh_file()
+            run_onload_ops()
+            return {'FINISHED'}
 
 
 class CreateCheckpointOperator(bpy.types.Operator):
@@ -339,20 +350,21 @@ class CreateCheckpointOperator(bpy.types.Operator):
     bl_label = "Create Checkpoint Operator"
 
     def execute(self, context):
-        save_file()
+        with WaitCursor():
+            save_file()
 
-        message = context.scene.commit_message
-        (success, response) = call_commit_api(message)
-        if not success and response == API_NOT_AVAILABLE_ERROR:
-            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            message = context.scene.commit_message
+            (success, response) = call_commit_api(message)
+            if not success and response == API_NOT_AVAILABLE_ERROR:
+                self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+                return {'FINISHED'}
+
+            if not success:
+                self.report({'ERROR'}, "Cannot commit")
+                return {'FINISHED'}
+
+            run_onload_ops()
             return {'FINISHED'}
-
-        if not success:
-            self.report({'ERROR'}, "Cannot commit")
-            return {'FINISHED'}
-
-        run_onload_ops()
-        return {'FINISHED'}
 
 
 class RefreshOperator(bpy.types.Operator):
