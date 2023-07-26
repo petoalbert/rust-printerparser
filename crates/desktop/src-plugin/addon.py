@@ -54,10 +54,11 @@ def call_commit_api(message):
     }
 
     try:
-        requests.post(url, headers=headers, data=json.dumps(data))
+        requests.post(url, headers=headers,
+                      data=json.dumps(data)).raise_for_status()
         return (True, None)
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -68,9 +69,10 @@ def call_checkpoints_api(current_branch):
 
     try:
         response = requests.get(url)
+        response.raise_for_status()
         return (True, response.json())
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -86,10 +88,11 @@ def call_restore_api(hash):
     }
 
     try:
-        requests.post(url, headers=headers, data=json.dumps(data))
+        requests.post(url, headers=headers,
+                      data=json.dumps(data)).raise_for_status()
         return (True, None)
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -105,10 +108,11 @@ def call_new_branch_api(new_branch_name):
     }
 
     try:
-        requests.post(url, headers=headers, data=json.dumps(data))
+        requests.post(url, headers=headers,
+                      data=json.dumps(data)).raise_for_status()
         return (True, None)
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -119,9 +123,10 @@ def call_list_branches_api():
 
     try:
         response = requests.get(url)
+        response.raise_for_status()
         return (True, response.json())
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -132,9 +137,10 @@ def call_get_current_branch_api():
 
     try:
         response = requests.get(url)
+        response.raise_for_status()
         return (True, response.json())
-    except:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 @with_healthcheck
@@ -150,10 +156,11 @@ def call_switch_branch_api(new_branch_name):
     }
 
     try:
-        requests.post(url, headers=headers, data=json.dumps(data))
+        requests.post(url, headers=headers,
+                      data=json.dumps(data)).raise_for_status()
         return (True, None)
-    except requests.exceptions.RequestException:
-        return (False, None)
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
 
 
 def call_list_branches_operator():
@@ -204,7 +211,7 @@ class ListCheckpointsOperator(bpy.types.Operator):
             return {'FINISHED'}
 
         if not success:
-            self.report({'ERROR'}, "Cannot list checkpoints")
+            self.report({'ERROR'}, f"Cannot list checkpoints: {result}")
             return {'FINISHED'}
 
         bpy.context.scene.checkpoint_items.clear()
@@ -229,7 +236,7 @@ class ListBranchesOperator(bpy.types.Operator):
             return {'FINISHED'}
 
         if not success:
-            self.report({'ERROR'}, "Cannot list branches")
+            self.report({'ERROR'}, f"Cannot list branches: {response}")
             return {'FINISHED'}
 
         bpy.context.scene.branch_items.clear()
@@ -253,7 +260,7 @@ class GetCurrentBranchOperator(bpy.types.Operator):
             return {'FINISHED'}
 
         if not success:
-            self.report({'ERROR'}, "Cannot get current branch")
+            self.report({'ERROR'}, f"Cannot get current branch: {response}")
             return {'FINISHED'}
 
         context.scene.current_branch = response
@@ -278,7 +285,7 @@ class SwitchBranchesOperator(bpy.types.Operator):
                 return {'FINISHED'}
 
             if not success:
-                self.report({'ERROR'}, "Cannot switch branch")
+                self.report({'ERROR'}, f"Cannot switch branch: {response}")
                 return {'FINISHED'}
 
             refresh_file()
@@ -301,7 +308,7 @@ class NewBranchOperator(bpy.types.Operator):
                 return {'FINISHED'}
 
             if not success:
-                self.report({'ERROR'}, "Cannot create new branch")
+                self.report({'ERROR'}, f"Cannot create new branch: {response}")
                 return {'FINISHED'}
 
             run_onload_ops()
@@ -336,7 +343,8 @@ class RestoreOperator(bpy.types.Operator):
                 return {'FINISHED'}
 
             if not success:
-                self.report({'ERROR'}, "Cannot restore checkpoint")
+                self.report(
+                    {'ERROR'}, f"Cannot restore checkpoint: {response}")
                 return {'FINISHED'}
 
             refresh_file()
@@ -360,7 +368,7 @@ class CreateCheckpointOperator(bpy.types.Operator):
                 return {'FINISHED'}
 
             if not success:
-                self.report({'ERROR'}, "Cannot commit")
+                self.report({'ERROR'}, f"Cannot create checkpoint: {response}")
                 return {'FINISHED'}
 
             run_onload_ops()
