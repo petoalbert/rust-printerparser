@@ -1,18 +1,11 @@
 use std::{fmt::Display, path::Path};
 
-use crate::exchange::Exchange;
-
 use super::structs::{BlockRecord, Commit};
 
 pub struct ShortCommitRecord {
     pub hash: String,
     pub branch: String,
     pub message: String,
-}
-
-pub struct ExportResult {
-    pub exchange: Exchange,
-    pub skipped: Vec<String>,
 }
 
 #[derive(Debug)]
