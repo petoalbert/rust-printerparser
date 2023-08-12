@@ -296,7 +296,9 @@ impl DB for Persistence {
             .map_err(|_| DBError::Error("Cannot read current branch name".to_owned()))
             .and_then(|v| {
                 v.map_or(
-                    Err(DBError::Error("Cannot read current branch name".to_owned())),
+                    Err(DBError::Consistency(
+                        "Cannot read current branch name".to_owned(),
+                    )),
                     Ok,
                 )
             })

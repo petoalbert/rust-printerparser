@@ -2,7 +2,7 @@ use flate2::{write::GzEncoder, Compression};
 use rayon::prelude::*;
 
 use crate::{
-    api::invariants::check_current_branch_current_commit_set,
+    api::{invariants::check_current_branch_current_commit_set, utils::block_hash_diff},
     blend::{
         blend_file::{Endianness, PointerSize},
         parsers::{blend, block, header as pheader, BlendFileParseState},
@@ -77,10 +77,6 @@ pub fn create_new_commit(
             .collect::<Result<Vec<BlockRecord>, DBError>>()
     })?;
 
-    measure_time!(format!("Writing blocks {:?}", file_path), {
-        conn.write_blocks(&block_data[..])?
-    });
-
     let header_bytes = pheader().write(&header, &mut parse_state).unwrap();
     let block_hashes: Vec<String> = measure_time!("Collecting block hashes", {
         block_data.iter().map(move |b| b.hash.to_owned()).collect()
@@ -97,7 +93,21 @@ pub fn create_new_commit(
 
     let current_brach_name = conn.read_current_branch_name()?;
 
-    let latest_commit = conn.read_current_latest_commit()?;
+    let latest_commit_hash = conn.read_current_latest_commit()?;
+
+    let latest_commit = conn.read_commit(&latest_commit_hash).ok().flatten();
+
+    let blocks_from_latest = match latest_commit {
+        None => block_data,
+        Some(commit) => {
+            let hashes = hash_list().parse(&commit.blocks, &mut ()).unwrap().1;
+            block_hash_diff(hashes, block_data)
+        }
+    };
+
+    measure_time!(format!("Writing blocks {:?}", file_path), {
+        conn.write_blocks(&blocks_from_latest[..])?
+    });
 
     let project_id = conn.read_project_id()?;
 
@@ -112,7 +122,7 @@ pub fn create_new_commit(
 
         let commit = Commit {
             hash: commit_hash,
-            prev_commit_hash: latest_commit,
+            prev_commit_hash: latest_commit_hash,
             project_id,
             branch: current_brach_name,
             message: message.unwrap_or_default(),
