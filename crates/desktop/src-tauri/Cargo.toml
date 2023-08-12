@@ -21,6 +21,12 @@ actix-web = "4"
 env_logger = "0.10.0"
 log = "0.4.19"
 
+[dependencies.uuid]
+version = "1.4.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+]
+
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!

@@ -66,7 +66,8 @@ fn run_get_current_branch(db_path: &str) {
 }
 
 fn run_init_command(db_path: &str) {
-    print_error_discard_rest(init_db(db_path));
+    let project_id = uuid::Uuid::new_v4().to_string();
+    print_error_discard_rest(init_db(db_path, &project_id));
 }
 
 fn main() {

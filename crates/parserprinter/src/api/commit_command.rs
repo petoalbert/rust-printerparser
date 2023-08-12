@@ -99,6 +99,8 @@ pub fn create_new_commit(
 
     let latest_commit = conn.read_current_latest_commit()?;
 
+    let project_id = conn.read_project_id()?;
+
     let commit_hash = format!("{:x}", blend_hash);
 
     conn.write_blocks_str(&commit_hash, &blocks_str)?;
@@ -111,6 +113,7 @@ pub fn create_new_commit(
         let commit = Commit {
             hash: commit_hash,
             prev_commit_hash: latest_commit,
+            project_id,
             branch: current_brach_name,
             message: message.unwrap_or_default(),
             author: name,
@@ -149,7 +152,7 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_path);
+        test_utils::init_db(tmp_path, "my-cool-project");
 
         create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
 
@@ -171,6 +174,7 @@ mod test {
         assert_eq!(commit.hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
         assert_eq!(commit.message, "Message");
         assert_eq!(commit.prev_commit_hash, "initial");
+        assert_eq!(commit.project_id, "my-cool-project");
 
         let current_branch_name = db
             .read_current_branch_name()
@@ -196,7 +200,7 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_path);
+        test_utils::init_db(tmp_path, "my-cool-project");
 
         create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
         create_new_commit(

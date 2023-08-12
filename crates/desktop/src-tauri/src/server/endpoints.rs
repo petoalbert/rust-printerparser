@@ -20,7 +20,8 @@ use crate::serde_instances::DBErrorWrapper;
 fn init_if_not_exists(db_path: &str) -> Result<(), DBError> {
     let exists = std::path::Path::new(db_path).exists();
     if !exists {
-        init_db(db_path)?;
+        let project_id = uuid::Uuid::new_v4().to_string();
+        init_db(db_path, &project_id)?;
     }
     Ok(())
 }

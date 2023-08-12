@@ -59,6 +59,9 @@ pub trait DB: Sized {
         tip: &str,
     ) -> Result<(), DBError>;
 
+    fn read_project_id(&self) -> Result<String, DBError>;
+    fn write_project_id(tx: &rusqlite::Transaction, project_id: &str) -> Result<(), DBError>;
+
     fn execute_in_transaction<F>(&mut self, f: F) -> Result<(), DBError>
     where
         F: FnOnce(&rusqlite::Transaction) -> Result<(), DBError>;
@@ -89,6 +92,11 @@ fn current_latest_commit_key() -> String {
     "CURRENT_LATEST_COMMIT".to_string()
 }
 
+#[inline]
+fn project_id_key() -> String {
+    "PROJECT_ID".to_string()
+}
+
 fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError> {
     tx.execute(
         "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
@@ -113,6 +121,7 @@ impl DB for Persistence {
                 "CREATE TABLE IF NOT EXISTS commits (
                     hash TEXT PRIMARY KEY,
                     prev_commit_hash TEXT,
+                    project_id TEXT,
                     branch TEXT,
                     message TEXT,
                     author TEXT,
@@ -207,10 +216,11 @@ impl DB for Persistence {
 
     fn write_commit(tx: &rusqlite::Transaction, commit: Commit) -> Result<(), DBError> {
         tx.execute(
-            "INSERT INTO commits (hash, prev_commit_hash, branch, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO commits (hash, prev_commit_hash, project_id, branch, message, author, date, header) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             (
                 commit.hash,
                 commit.prev_commit_hash,
+                commit.project_id,
                 commit.branch,
                 commit.message,
                 commit.author,
@@ -231,14 +241,15 @@ impl DB for Persistence {
             .map(|bs| String::from_utf8(bs).unwrap())
             .ok_or(DBError::Consistency("No working dir found".to_owned()))?;
 
-        self.sqlite_db.query_row("SELECT hash, prev_commit_hash, branch, message, author, date, header FROM commits WHERE hash = ?1", [hash], |row| Ok(Some(Commit {
+        self.sqlite_db.query_row("SELECT hash, prev_commit_hash, project_id, branch, message, author, date, header FROM commits WHERE hash = ?1", [hash], |row| Ok(Some(Commit {
             hash: row.get(0).expect("No hash found in row"),
             prev_commit_hash: row.get(1).expect("No prev_commit_hash found in row"),
-            branch: row.get(2).expect("No branch found in row"),
-            message: row.get(3).expect("No message found in row"),
-            author: row.get(4).expect("No author found in row"),
-            date: row.get(5).expect("No date found in row"),
-            header: row.get(6).expect("No header found in row"),
+            project_id: row.get(2).expect("No project_id found in row"),
+            branch: row.get(3).expect("No branch found in row"),
+            message: row.get(4).expect("No message found in row"),
+            author: row.get(5).expect("No author found in row"),
+            date: row.get(6).expect("No date found in row"),
+            header: row.get(7).expect("No header found in row"),
             blocks,
         }))).map_err(|e| DBError::Error(format!("Cannot read commit: {:?}", e)))
     }
@@ -388,5 +399,22 @@ impl DB for Persistence {
 
         tx.commit()
             .map_err(|_| DBError::Fundamental("Cannot commit transaction".to_owned()))
+    }
+
+    fn read_project_id(&self) -> Result<String, DBError> {
+        self.read_config(&project_id_key())
+            .map_err(|_| DBError::Error("Cannot read project id".to_owned()))
+            .and_then(|v| {
+                v.map_or(
+                    Err(DBError::Fundamental(
+                        "Current project key not set".to_owned(),
+                    )),
+                    Ok,
+                )
+            })
+    }
+
+    fn write_project_id(tx: &rusqlite::Transaction, project_id: &str) -> Result<(), DBError> {
+        write_config_inner(tx, &project_id_key(), project_id)
     }
 }

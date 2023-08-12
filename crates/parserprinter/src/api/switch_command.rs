@@ -45,7 +45,7 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path);
+        test_utils::init_db(tmp_db_path, "my-cool-project");
 
         let res = switch_branches(tmp_db_path, "unknown", "void.blend");
         assert!(matches!(res, Err(_)));
@@ -82,7 +82,7 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path);
+        test_utils::init_db(tmp_db_path, "my-cool-project");
 
         // a commit to `main`
         test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");

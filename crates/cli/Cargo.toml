@@ -8,3 +8,9 @@ clap = { version = "4.3.3", features = ["derive"] }
 env_logger = "0.10.0"
 log = "0.4.19"
 parserprinter = { path = "../parserprinter/" }
+
+[dependencies.uuid]
+version = "1.4.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+]
