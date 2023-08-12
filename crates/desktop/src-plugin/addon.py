@@ -25,7 +25,9 @@ def get_file_path():
 
 
 def get_db_path(file_path):
-    return os.path.join(os.path.dirname(file_path), ".timeline")
+    filename = os.path.basename(file_path)
+    filename_with_ext = '.' + filename + '.timeline'
+    return os.path.join(os.path.dirname(file_path), filename_with_ext)
 
 
 def call_healthcheck_api():
