@@ -6,10 +6,10 @@ use actix_web::{
 use log::error;
 use parserprinter::{
     api::{
-        commit_command::create_new_commit, get_current_branch, init_command::init_db,
-        list_branches_command::list_braches, log_checkpoints_command::list_checkpoints,
-        new_branch_command::create_new_branch, restore_command::restore_checkpoint,
-        switch_command::switch_branches,
+        commit_command::create_new_commit, get_current_branch, get_latest_commit,
+        init_command::init_db, list_branches_command::list_braches,
+        log_checkpoints_command::list_checkpoints, new_branch_command::create_new_branch,
+        restore_command::restore_checkpoint, switch_command::switch_branches,
     },
     db::db_ops::DBError,
 };
@@ -160,6 +160,20 @@ pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
     let (db_path,) = path.into_inner();
     let result =
         init_if_not_exists(&db_path).and_then(|_| get_current_branch::get_current_branch(&db_path));
+    match result {
+        Ok(branch) => HttpResponse::Ok().json(branch),
+        Err(err) => {
+            error!("{}", err);
+            HttpResponse::BadRequest().json(DBErrorWrapper(err))
+        }
+    }
+}
+
+#[get("/commit/latest/{db_path}")]
+pub async fn read_latest_commit_hash(path: web::Path<(String,)>) -> impl Responder {
+    let (db_path,) = path.into_inner();
+    let result =
+        init_if_not_exists(&db_path).and_then(|_| get_latest_commit::get_latest_commit(&db_path));
     match result {
         Ok(branch) => HttpResponse::Ok().json(branch),
         Err(err) => {

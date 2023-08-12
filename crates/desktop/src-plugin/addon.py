@@ -16,6 +16,10 @@ URL = 'http://127.0.0.1:8080'
 API_NOT_AVAILABLE_ERROR = "Server not running!"
 
 
+CHECKMARK_ICON = 'CHECKMARK'
+BLANK_ICON = 'BLANK1'
+
+
 def get_file_path():
     return bpy.data.filepath
 
@@ -144,6 +148,20 @@ def call_get_current_branch_api():
 
 
 @with_healthcheck
+def call_get_latest_commit_hash():
+    file_path = get_file_path()
+    db_path = get_db_path(file_path)
+    url = f'{URL}/commit/latest/{quote_plus(db_path)}'
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return (True, response.json())
+    except requests.exceptions.RequestException as err:
+        return (False, err.response.json())
+
+
+@with_healthcheck
 def call_switch_branch_api(new_branch_name):
     file_path = get_file_path()
     db_path = get_db_path(file_path)
@@ -175,10 +193,15 @@ def call_get_current_branch_operator():
     bpy.ops.wm.get_current_branch_operator()
 
 
+def call_call_get_latest_commit_hash_operator():
+    bpy.ops.wm.get_latest_commit_hash_operator()
+
+
 def run_onload_ops():
     call_get_current_branch_operator()
     call_list_branches_operator()
     call_list_checkpoints_operator()
+    call_call_get_latest_commit_hash_operator()
 
 
 def save_file():
@@ -264,6 +287,27 @@ class GetCurrentBranchOperator(bpy.types.Operator):
             return {'FINISHED'}
 
         context.scene.current_branch = response
+
+        return {'FINISHED'}
+
+
+class GetLatestCommitHashOperator(bpy.types.Operator):
+    """Get the hash of the latest commit"""
+    bl_idname = "wm.get_latest_commit_hash_operator"
+    bl_label = "Get the hash of the latest commit"
+
+    def execute(self, context):
+        (success, response) = call_get_latest_commit_hash()
+        if not success and response == API_NOT_AVAILABLE_ERROR:
+            self.report({'ERROR'}, API_NOT_AVAILABLE_ERROR)
+            return {'FINISHED'}
+
+        if not success:
+            self.report(
+                {'ERROR'}, f"Cannot get latest commit hash: {response}")
+            return {'FINISHED'}
+
+        context.scene.latest_commit_hash = response
 
         return {'FINISHED'}
 
@@ -395,6 +439,7 @@ class TimelinePanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
+        # BRANCHES
         branches_box = layout.box()
         branches_box.label(text="Branches")
 
@@ -404,19 +449,24 @@ class TimelinePanel(bpy.types.Panel):
 
         for item in context.scene.branch_items:
             row = branches_box.row()
-            row.label(text=item.name)
+            icon = CHECKMARK_ICON if item.name == context.scene.current_branch else BLANK_ICON
+            row.label(text=item.name, icon=icon)
             row.operator("wm.switch_branch_operator",
                          text="Switch to").name = item.name
         branches_box.operator("wm.new_branch_operator", text="New branch")
 
-        restore_box = layout.box()
-        restore_box.label(text="Restore checkpoint")
-        for item in context.scene.checkpoint_items:
-            row = restore_box.row()
-            row.label(text=item.message)
-            row.operator("my.restore_operator",
-                         text="Restore").hash = item.hash
+        # CHECKPOINT ITEMS
+        if len(context.scene.checkpoint_items) > 0:
+            restore_box = layout.box()
+            restore_box.label(text="Restore checkpoint")
+            for item in context.scene.checkpoint_items:
+                row = restore_box.row()
+                icon = CHECKMARK_ICON if item.hash == context.scene.latest_commit_hash else BLANK_ICON
+                row.label(text=item.message, icon=icon)
+                row.operator("my.restore_operator",
+                             text="Restore").hash = item.hash
 
+        # NEW CHECKPOINT
         checkpoint_box = layout.box()
         checkpoint_box.label(text="New Checkpoint")
         checkpoint_box.prop(context.scene, "commit_message", text="")
@@ -432,6 +482,7 @@ def register():
     bpy.utils.register_class(SwitchBranchesOperator)
     bpy.utils.register_class(NewBranchOperator)
     bpy.utils.register_class(GetCurrentBranchOperator)
+    bpy.utils.register_class(GetLatestCommitHashOperator)
     bpy.utils.register_class(CheckpointItem)
     bpy.utils.register_class(BranchItem)
     bpy.utils.register_class(RestoreOperator)
@@ -444,6 +495,7 @@ def register():
     bpy.types.Scene.branch_items = bpy.props.CollectionProperty(
         type=BranchItem)
     bpy.types.Scene.current_branch = bpy.props.StringProperty(name="")
+    bpy.types.Scene.latest_commit_hash = bpy.props.StringProperty(name="")
     bpy.types.Scene.commit_message = bpy.props.StringProperty(
         name="", options={'TEXTEDIT_UPDATE'})
 
@@ -456,6 +508,7 @@ def unregister():
     bpy.utils.unregister_class(SwitchBranchesOperator)
     bpy.utils.unregister_class(NewBranchOperator)
     bpy.utils.unregister_class(GetCurrentBranchOperator)
+    bpy.utils.unregister_class(GetLatestCommitHashOperator)
     bpy.utils.unregister_class(CheckpointItem)
     bpy.utils.unregister_class(BranchItem)
     bpy.utils.unregister_class(RestoreOperator)
@@ -467,6 +520,7 @@ def unregister():
     del bpy.types.Scene.branch_items
     del bpy.types.Scene.commit_message
     del bpy.types.Scene.current_branch
+    del bpy.types.Scene.latest_commit_hash
 
 
 if __name__ == "__main__":

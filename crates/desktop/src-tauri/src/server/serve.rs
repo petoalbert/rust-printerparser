@@ -1,8 +1,8 @@
 use actix_web::{App, HttpServer};
 
 use super::endpoints::{
-    branches, checkpoints, commit, healthcheck, new_branch, read_current_branch, restore,
-    switch_branch,
+    branches, checkpoints, commit, healthcheck, new_branch, read_current_branch,
+    read_latest_commit_hash, restore, switch_branch,
 };
 
 pub async fn serve() {
@@ -16,6 +16,7 @@ pub async fn serve() {
             .service(new_branch)
             .service(switch_branch)
             .service(read_current_branch)
+            .service(read_latest_commit_hash)
     })
     .bind(("127.0.0.1", 8080))
     .expect("Cannot bind to 127.0.0.1:8080")
