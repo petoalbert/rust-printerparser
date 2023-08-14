@@ -64,6 +64,11 @@ pub trait DB: Sized {
     fn read_project_id(&self) -> Result<String, DBError>;
     fn write_project_id(tx: &rusqlite::Transaction, project_id: &str) -> Result<(), DBError>;
 
+    fn delete_branch_with_commits(
+        tx: &rusqlite::Transaction,
+        branch_name: &str,
+    ) -> Result<(), DBError>;
+
     fn execute_in_transaction<F>(&mut self, f: F) -> Result<(), DBError>
     where
         F: FnOnce(&rusqlite::Transaction) -> Result<(), DBError>;
@@ -455,10 +460,42 @@ impl DB for Persistence {
 
         Ok(result)
     }
+
+    fn delete_branch_with_commits(
+        tx: &rusqlite::Transaction,
+        branch_name: &str,
+    ) -> Result<(), DBError> {
+        let mut delete_commits_stmt = tx
+            .prepare(
+                "
+            DELETE FROM commits WHERE branch = ?1;
+            ",
+            )
+            .map_err(|e| DBError::Fundamental(format!("Cannot prepare query: {:?}", e)))?;
+
+        let mut delete_branch_stmt = tx
+            .prepare(
+                "
+            DELETE FROM branches WHERE name = ?1;
+            ",
+            )
+            .map_err(|e| DBError::Fundamental(format!("Cannot prepare query: {:?}", e)))?;
+
+        delete_commits_stmt
+            .execute([branch_name])
+            .map_err(|e| DBError::Error(format!("Cannot execute statement: {:?}", e)))?;
+
+        delete_branch_stmt
+            .execute([branch_name])
+            .map_err(|e| DBError::Error(format!("Cannot execute statement: {:?}", e)))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use rayon::vec;
     use tempfile::TempDir;
 
     use crate::api::test_utils;
@@ -466,7 +503,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_recursive_query() {
+    fn test_read_descendants_of_commit() {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
@@ -592,54 +629,206 @@ mod tests {
         .expect("Cannot execute transaction");
 
         // Check the diagram above
-        { // Descendants of 1
+        {
+            // Descendants of 1
             let commits = db
                 .read_descendants_of_commit("1")
                 .expect("Cannot read commits");
-    
+
             let hashes: Vec<String> = commits.iter().map(|c| c.hash.clone()).collect();
-    
+
             assert_eq!(hashes, vec!["1", "2", "3", "4", "a", "x", "b"]);
         }
 
-        { // Descendants of a
+        {
+            // Descendants of a
             let commits = db
                 .read_descendants_of_commit("a")
                 .expect("Cannot read commits");
-    
+
             let hashes: Vec<String> = commits.iter().map(|c| c.hash.clone()).collect();
-    
+
             assert_eq!(hashes, vec!["a", "b"]);
         }
 
-        { // Descendants of 2
+        {
+            // Descendants of 2
             let commits = db
                 .read_descendants_of_commit("2")
                 .expect("Cannot read commits");
-    
+
             let hashes: Vec<String> = commits.iter().map(|c| c.hash.clone()).collect();
-    
+
             assert_eq!(hashes, vec!["2", "3", "4", "x"]);
         }
 
-        { // Descendants of 3
-            let commits = db
+        {
+            // Descendants of 3
+            let hashes: Vec<String> = db
                 .read_descendants_of_commit("3")
-                .expect("Cannot read commits");
-    
-            let hashes: Vec<String> = commits.iter().map(|c| c.hash.clone()).collect();
-    
+                .expect("Cannot read commits")
+                .into_iter()
+                .map(|c| c.hash)
+                .collect();
+
             assert_eq!(hashes, vec!["3", "4", "x"]);
         }
 
-        { // Descendants of x
+        {
+            // Descendants of x
             let commits = db
                 .read_descendants_of_commit("x")
                 .expect("Cannot read commits");
-    
+
             let hashes: Vec<String> = commits.iter().map(|c| c.hash.clone()).collect();
-    
+
             assert_eq!(hashes, vec!["x"]);
         }
+    }
+
+    #[test]
+    fn test_delete_branch_with_commits() {
+        let tmp_dir = TempDir::new().expect("Cannot create temp dir");
+        let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
+
+        test_utils::init_db(tmp_path, "my-cool-project");
+
+        let mut db = Persistence::open(tmp_path).expect("Cannot open test DB");
+
+        /*
+          alt1           x
+                        /
+          main 1 - 2 - 3 - 4
+                \
+          alt2    a - b
+        */
+        db.execute_in_transaction(|tx| {
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "1".to_owned(),
+                    prev_commit_hash: "initial".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "main".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 1,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "2".to_owned(),
+                    prev_commit_hash: "1".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "main".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 2,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "3".to_owned(),
+                    prev_commit_hash: "2".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "main".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 3,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "4".to_owned(),
+                    prev_commit_hash: "3".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "main".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 4,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "a".to_owned(),
+                    prev_commit_hash: "1".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "alt2".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 10,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "b".to_owned(),
+                    prev_commit_hash: "a".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "main".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 11,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: "x".to_owned(),
+                    prev_commit_hash: "3".to_owned(),
+                    project_id: "a".to_owned(),
+                    branch: "alt1".to_owned(),
+                    message: "hi".to_owned(),
+                    author: "test".to_owned(),
+                    date: 10,
+                    header: vec![],
+                    blocks: "".to_owned(),
+                },
+            )?;
+
+            Persistence::write_branch_tip(tx, "main", "4")?;
+            Persistence::write_branch_tip(tx, "alt1", "x")?;
+            Persistence::write_branch_tip(tx, "alt2", "b")?;
+
+            Ok(())
+        })
+        .expect("Cannot execute transaction");
+
+        db.execute_in_transaction(|tx| Persistence::delete_branch_with_commits(tx, "alt2"))
+            .expect("cannot delete");
+
+        let branches = db.read_all_branches().expect("Cannot read branches");
+        assert_eq!(branches, vec!["alt1", "main"]);
+
+        let commits: Vec<String> = db
+            .read_descendants_of_commit("1")
+            .expect("cannot read descendants of commit")
+            .into_iter()
+            .map(|c| c.hash)
+            .collect();
+
+        assert_eq!(commits, vec!["1", "2", "3", "4", "x"]);
     }
 }
