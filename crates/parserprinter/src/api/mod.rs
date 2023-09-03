@@ -9,6 +9,8 @@ pub mod new_branch_command;
 pub mod restore_command;
 pub mod switch_command;
 pub mod test_command;
+pub mod export_descendants_of_commit;
+pub mod import_exchange;
 
 pub mod test_utils;
 

@@ -41,7 +41,7 @@ pub trait DB: Sized {
     fn read_ancestors_of_commit(&self, brach_name: &str)
         -> Result<Vec<ShortCommitRecord>, DBError>;
 
-    fn read_descendants_of_commit(&self, hash: &str) -> Result<Vec<ShortCommitRecord>, DBError>;
+    fn read_descendants_of_commit(&self, hash: &str) -> Result<Vec<Commit>, DBError>;
 
     fn read_current_branch_name(&self) -> Result<String, DBError>;
     fn write_current_branch_name(
@@ -111,6 +111,14 @@ fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Res
     )
     .map_err(|_| DBError::Error(format!("Cannot set {:?} for {:?}", value, key)))
     .map(|_| ())
+}
+
+fn get_blocks_by_hash(rocks_db: &rocksdb::DB, hash: &str) -> Result<String, DBError> {
+    rocks_db
+        .get(working_dir_key(hash))
+        .map_err(|e| DBError::Error(format!("Cannot read working dir key: {:?}", e)))?
+        .map(|bs| String::from_utf8(bs).unwrap())
+        .ok_or(DBError::Consistency("No working dir found".to_owned()))
 }
 
 impl DB for Persistence {
@@ -298,6 +306,54 @@ impl DB for Persistence {
         Ok(result)
     }
 
+    fn read_descendants_of_commit(&self, hash: &str) -> Result<Vec<Commit>, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare(
+                "
+                WITH RECURSIVE ancestor_commits(hash, prev_commit_hash, project_id, branch, message, author, date, header) AS (
+                    SELECT hash, prev_commit_hash, project_id, branch, message, author, date, header FROM commits WHERE hash = ?1
+                    UNION ALL
+                    SELECT c.hash, c.prev_commit_hash, c.project_id, c.branch, c.message, c.author, c.date, c.header FROM commits c
+                    JOIN ancestor_commits a ON c.prev_commit_hash = a.hash
+                )
+                SELECT hash, prev_commit_hash, project_id, branch, message, author, date, header FROM ancestor_commits ORDER BY date ASC;
+                ",
+            )
+            .map_err(|e| {
+                DBError::Fundamental(format!("Cannot prepare read commits query: {:?}", e))
+            })?;
+
+        let mut rows = stmt
+            .query([hash])
+            .map_err(|e| DBError::Error(format!("Cannot read commits: {:?}", e)))?;
+
+        let mut result: Vec<Commit> = vec![];
+
+        while let Ok(Some(data)) = rows.next() {
+            let hash: String = data
+                .get::<usize, String>(0)
+                .expect("No hash found in row")
+                .to_string();
+
+            let blocks = get_blocks_by_hash(&self.rocks_db, &hash)?;
+
+            result.push(Commit {
+                hash,
+                prev_commit_hash: data.get(1).expect("No prev_commit_hash found in row"),
+                project_id: data.get(2).expect("No project_id found in row"),
+                branch: data.get(3).expect("No branch found in row"),
+                message: data.get(4).expect("No message found in row"),
+                author: data.get(5).expect("No author found in row"),
+                date: data.get(6).expect("No date found in row"),
+                header: data.get(7).expect("No header found in row"),
+                blocks,
+            })
+        }
+
+        Ok(result)
+    }
+
     fn read_current_branch_name(&self) -> Result<String, DBError> {
         self.read_config(&current_branch_name_key())
             .map_err(|_| DBError::Error("Cannot read current branch name".to_owned()))
@@ -427,40 +483,6 @@ impl DB for Persistence {
         write_config_inner(tx, &project_id_key(), project_id)
     }
 
-    fn read_descendants_of_commit(&self, hash: &str) -> Result<Vec<ShortCommitRecord>, DBError> {
-        let mut stmt = self
-            .sqlite_db
-            .prepare(
-                "
-                WITH RECURSIVE ancestor_commits(hash, branch, message, prev_commit_hash, date) AS (
-                    SELECT hash, branch, message, prev_commit_hash, date FROM commits WHERE hash = ?1
-                    UNION ALL
-                    SELECT c.hash, c.branch, c.message, c.prev_commit_hash, c.date FROM commits c
-                    JOIN ancestor_commits a ON c.prev_commit_hash = a.hash
-                )
-                SELECT hash, branch, message FROM ancestor_commits ORDER BY date ASC;
-                ",
-            )
-            .map_err(|e| {
-                DBError::Fundamental(format!("Cannot prepare read commits query: {:?}", e))
-            })?;
-
-        let mut rows = stmt
-            .query([hash])
-            .map_err(|e| DBError::Error(format!("Cannot read commits: {:?}", e)))?;
-
-        let mut result: Vec<ShortCommitRecord> = vec![];
-        while let Ok(Some(data)) = rows.next() {
-            result.push(ShortCommitRecord {
-                hash: data.get(0).expect("cannot get hash"),
-                branch: data.get(1).expect("cannot get branch"),
-                message: data.get(2).expect("cannot read message"),
-            })
-        }
-
-        Ok(result)
-    }
-
     fn delete_branch_with_commits(
         tx: &rusqlite::Transaction,
         branch_name: &str,
@@ -495,7 +517,6 @@ impl DB for Persistence {
 
 #[cfg(test)]
 mod tests {
-    use rayon::vec;
     use tempfile::TempDir;
 
     use crate::api::test_utils;
@@ -518,6 +539,13 @@ mod tests {
            \
               a - b
         */
+        db.write_blocks_str("1", "aaa").unwrap();
+        db.write_blocks_str("2", "bbb").unwrap();
+        db.write_blocks_str("3", "ccc").unwrap();
+        db.write_blocks_str("4", "ddd").unwrap();
+        db.write_blocks_str("a", "eee").unwrap();
+        db.write_blocks_str("b", "fff").unwrap();
+        db.write_blocks_str("x", "xxx").unwrap();
         db.execute_in_transaction(|tx| {
             Persistence::write_commit(
                 tx,
@@ -530,7 +558,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 1,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "aaa".to_owned(),
                 },
             )?;
 
@@ -545,7 +573,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 2,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "bbb".to_owned(),
                 },
             )?;
 
@@ -560,7 +588,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 3,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "ccc".to_owned(),
                 },
             )?;
 
@@ -575,7 +603,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 4,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "ddd".to_owned(),
                 },
             )?;
 
@@ -590,7 +618,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 10,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "eee".to_owned(),
                 },
             )?;
 
@@ -605,7 +633,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 11,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "fff".to_owned(),
                 },
             )?;
 
@@ -620,7 +648,7 @@ mod tests {
                     author: "test".to_owned(),
                     date: 10,
                     header: vec![],
-                    blocks: "".to_owned(),
+                    blocks: "xxx".to_owned(),
                 },
             )?;
 
@@ -702,6 +730,13 @@ mod tests {
                 \
           alt2    a - b
         */
+        db.write_blocks_str("1", "aaa").unwrap();
+        db.write_blocks_str("2", "bbb").unwrap();
+        db.write_blocks_str("3", "ccc").unwrap();
+        db.write_blocks_str("4", "ddd").unwrap();
+        db.write_blocks_str("a", "eee").unwrap();
+        db.write_blocks_str("b", "fff").unwrap();
+        db.write_blocks_str("x", "xxx").unwrap();
         db.execute_in_transaction(|tx| {
             Persistence::write_commit(
                 tx,

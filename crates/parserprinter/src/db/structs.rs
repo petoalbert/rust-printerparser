@@ -1,16 +1,18 @@
+use serde::{Deserialize, Serialize};
+
 use crate::printer_parser::{
     combinator::{repeat1, separated_list},
     primitives::char,
     printerparser::{consume_char, PrinterParserOps},
 };
 
-#[derive(Clone)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub struct BlockRecord {
     pub hash: String,
     pub data: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
 pub struct Commit {
     pub hash: String,
     pub prev_commit_hash: String,
