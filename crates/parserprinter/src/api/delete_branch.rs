@@ -12,6 +12,12 @@ pub fn delete_branch(db_path: &str, branch_name: &str) -> Result<(), DBError> {
         return Err(DBError::Error("Cannot delete current branch".to_owned()));
     }
 
+    let branch = db.read_branch_tip(branch_name)?;
+    if branch.is_none() {
+        // not really an error but too lazy to make a new type
+        return Err(DBError::Error("Cannot delete non-existent branch".to_owned()));
+    }
+
     db.execute_in_transaction(|tx| Persistence::delete_branch_with_commits(tx, branch_name))?;
 
     Ok(())

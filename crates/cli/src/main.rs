@@ -5,11 +5,19 @@ use cli::{parse_args, Commands};
 use log::error;
 use parserprinter::{
     api::{
-        commit_command::create_new_commit, get_current_branch::get_current_branch,
-        init_command::init_db, list_branches_command::list_braches,
-        log_checkpoints_command::list_checkpoints, new_branch_command::create_new_branch,
-        restore_command::restore_checkpoint, switch_command::switch_branches,
+        commit_command::create_new_commit,
+        delete_branch::delete_branch,
+        export_descendants_of_commit::export_descendants_of_commit,
+        get_current_branch::get_current_branch,
+        import_exchange,
+        init_command::init_db,
+        list_branches_command::list_braches,
+        log_checkpoints_command::list_checkpoints,
+        new_branch_command::create_new_branch,
+        restore_command::restore_checkpoint,
+        switch_command::switch_branches,
         test_command::run_command_test,
+        utils::{read_exchange_from_file, write_exchange_to_file},
     },
     db::db_ops::DBError,
 };
@@ -70,6 +78,21 @@ fn run_init_command(db_path: &str) {
     print_error_discard_rest(init_db(db_path, &project_id));
 }
 
+fn run_export_command(db_path: &str, root_hash: &str, path_to_file: &str) {
+    let exchange = export_descendants_of_commit(db_path, root_hash).expect("Cannot export");
+    write_exchange_to_file(&exchange, path_to_file).expect("Cannot write exchange file");
+}
+
+fn run_import_command(db_path: &str, path_to_exchange: &str) {
+    let exchange =
+        read_exchange_from_file(path_to_exchange).expect("Cannot read exchange from file");
+    import_exchange::import_exchange(db_path, exchange).expect("Cannot import exchange");
+}
+
+fn run_delete_branch_command(db_path: &str, branch_name: &str) {
+    delete_branch(&db_path, &branch_name).expect("Cannot delete branch")
+}
+
 fn main() {
     let args = parse_args();
     env_logger::init();
@@ -98,5 +121,18 @@ fn main() {
         } => run_switch_branches(&db_path, &file_path, &branch),
         Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, &branch),
         Commands::Init { db_path } => run_init_command(&db_path),
+        Commands::Export {
+            db_path,
+            from_commit,
+            path_to_exchange,
+        } => run_export_command(&db_path, &from_commit, &path_to_exchange),
+        Commands::Import {
+            db_path,
+            path_to_exchange,
+        } => run_import_command(&db_path, &path_to_exchange),
+        Commands::DeleteBranch {
+            db_path,
+            branch_name,
+        } => run_delete_branch_command(&db_path, &branch_name),
     }
 }

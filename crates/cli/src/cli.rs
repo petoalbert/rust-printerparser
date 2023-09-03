@@ -61,6 +61,17 @@ pub enum Commands {
         branch_name: String,
     },
 
+    /// Delete a brach
+    DeleteBranch {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// The name of the new branch
+        #[arg(short, long)]
+        branch_name: String,
+    },
+
     /// Lists all existing branches
     ListBranches {
         /// Path to the blend file DB
@@ -96,7 +107,7 @@ pub enum Commands {
         #[arg(short, long)]
         db_path: String,
 
-        /// Optional: name of the branch to log checkpoints for
+        /// name of the branch to log checkpoints for
         #[arg(short, long)]
         branch: String,
     },
@@ -106,6 +117,31 @@ pub enum Commands {
         /// Path to the blend file DB
         #[arg(short, long)]
         db_path: String,
+    },
+
+    /// Export descendants of a commit
+    Export {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Export descendants of this commit
+        #[arg(short, long)]
+        from_commit: String,
+
+        /// Path to the exchange file
+        #[arg(short, long)]
+        path_to_exchange: String,
+    },
+
+    /// Import an exchange file
+    Import {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        #[arg(short, long)]
+        path_to_exchange: String,
     },
 }
 
