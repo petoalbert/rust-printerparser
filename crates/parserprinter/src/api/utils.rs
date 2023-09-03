@@ -47,7 +47,7 @@ pub fn block_hash_diff(older: Vec<String>, newer: Vec<BlockRecord>) -> Vec<Block
 }
 
 pub fn write_exchange_to_file(exchange: &Exchange, path: &str) -> Result<(), String> {
-    let bytes = encode_exchange(&exchange)?;
+    let bytes = encode_exchange(exchange)?;
 
     let temp_file =
         NamedTempFile::new().map_err(|e| format!("Cannot create temp file: {:?}", e))?;

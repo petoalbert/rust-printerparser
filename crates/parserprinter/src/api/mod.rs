@@ -11,8 +11,8 @@ pub mod switch_command;
 pub mod test_command;
 pub mod export_descendants_of_commit;
 pub mod import_exchange;
+pub mod utils;
 
 pub mod test_utils;
 
 mod invariants;
-mod utils;
