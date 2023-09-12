@@ -15,6 +15,23 @@ pub fn decode_exchange(data: &[u8]) -> Result<Exchange, String> {
     bincode::deserialize(data).map_err(|e| format!("Cannot decode exchange: {:?}", e))
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Sync {
+    // tips of local branches
+    // the descendants of these will be returned
+    pub local_tips: Vec<String>,
+    // data that will be sent "up"
+    pub exchange: Exchange,
+}
+
+pub fn decode_sync(data: &[u8]) -> Result<Sync, String> {
+    bincode::deserialize(data).map_err(|e| format!("Cannot decode sync: {:?}", e))
+}
+
+pub fn encode_sync(sync: &Sync) -> Result<Vec<u8>, String> {
+    bincode::serialize(sync).map_err(|e| format!("Cannot encode sync: {:?}", e))
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
