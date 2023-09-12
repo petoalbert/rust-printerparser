@@ -19,6 +19,7 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBE
 
     db.execute_in_transaction(|tx| {
         Persistence::write_branch_tip(tx, new_branch_name, &tip)?;
+        Persistence::write_remote_branch_tip(tx, new_branch_name, &tip)?;
 
         Persistence::write_current_branch_name(tx, new_branch_name)?;
 

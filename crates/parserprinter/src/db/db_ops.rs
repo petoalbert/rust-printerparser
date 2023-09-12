@@ -61,6 +61,13 @@ pub trait DB: Sized {
         tip: &str,
     ) -> Result<(), DBError>;
 
+    fn read_remote_branch_tip(&self, branch_name: &str) -> Result<String, DBError>;
+    fn write_remote_branch_tip(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+        tip: &str,
+    ) -> Result<(), DBError>;
+
     fn read_project_id(&self) -> Result<String, DBError>;
     fn write_project_id(tx: &rusqlite::Transaction, project_id: &str) -> Result<(), DBError>;
 
@@ -150,6 +157,16 @@ impl DB for Persistence {
         sqlite_db
             .execute(
                 "CREATE TABLE IF NOT EXISTS branches (
+                    name TEXT PRIMARY KEY,
+                    tip TEXT
+                )",
+                [],
+            )
+            .map_err(|e| DBError::Fundamental(format!("Cannot create branches table: {:?}", e)))?;
+
+        sqlite_db
+            .execute(
+                "CREATE TABLE IF NOT EXISTS remote_branches (
                     name TEXT PRIMARY KEY,
                     tip TEXT
                 )",
@@ -424,6 +441,48 @@ impl DB for Persistence {
     ) -> Result<(), DBError> {
         tx.execute(
             "INSERT OR REPLACE INTO branches (name, tip) VALUES (?1, ?2)",
+            [&brach_name, &tip],
+        )
+        .map_err(|e| {
+            DBError::Error(format!(
+                "Cannot create new branch {:?}: {:?}",
+                brach_name, e
+            ))
+        })
+        .map(|_| ())
+    }
+
+    fn read_remote_branch_tip(&self, branch_name: &str) -> Result<String, DBError> {
+        let mut stmt = self
+            .sqlite_db
+            .prepare("SELECT tip FROM remote_branches WHERE name = ?1")
+            .map_err(|e| DBError::Error(format!("Cannot query branch: {:?}", e)))?;
+
+        let mut rows = stmt
+            .query([branch_name])
+            .map_err(|e| DBError::Error(format!("Cannot query branch: {:?}", e)))?;
+
+        let row = rows.next();
+
+        if let Ok(Some(data)) = row {
+            Ok(data.get(0).unwrap())
+        } else if let Ok(None) = row {
+            Err(DBError::Consistency(format!(
+                "No remote branch tip exists for {:?}",
+                branch_name
+            )))
+        } else {
+            Err(DBError::Error("Cannot query branch".to_owned()))
+        }
+    }
+
+    fn write_remote_branch_tip(
+        tx: &rusqlite::Transaction,
+        brach_name: &str,
+        tip: &str,
+    ) -> Result<(), DBError> {
+        tx.execute(
+            "INSERT OR REPLACE INTO remote_branches (name, tip) VALUES (?1, ?2)",
             [&brach_name, &tip],
         )
         .map_err(|e| {

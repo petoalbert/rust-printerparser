@@ -4,6 +4,7 @@ pub fn init_db(db_path: &str, project_id: &str) -> Result<(), DBError> {
     let mut db = Persistence::open(db_path)?;
     db.execute_in_transaction(|tx| {
         Persistence::write_branch_tip(tx, "main", "initial")?;
+        Persistence::write_remote_branch_tip(tx, "main", "initial")?;
         Persistence::write_current_branch_name(tx, "main")?;
         Persistence::write_current_latest_commit(tx, "initial")?;
         Persistence::write_project_id(tx, project_id)?;

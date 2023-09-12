@@ -14,12 +14,14 @@ use parserprinter::{
         list_branches_command::list_braches,
         log_checkpoints_command::list_checkpoints,
         new_branch_command::create_new_branch,
+        prepare_sync::prepare_sync,
         restore_command::restore_checkpoint,
         switch_command::switch_branches,
         test_command::run_command_test,
         utils::{read_exchange_from_file, write_exchange_to_file},
     },
     db::db_ops::DBError,
+    exchange::structs::{decode_exchange, encode_sync},
 };
 
 fn print_error_discard_rest<T>(res: Result<T, DBError>) {
@@ -90,7 +92,26 @@ fn run_import_command(db_path: &str, path_to_exchange: &str) {
 }
 
 fn run_delete_branch_command(db_path: &str, branch_name: &str) {
-    delete_branch(&db_path, &branch_name).expect("Cannot delete branch")
+    delete_branch(db_path, branch_name).expect("Cannot delete branch")
+}
+
+fn sync_to_server(db_path: &str, url: &str) {
+    let sync = prepare_sync(db_path).expect("Cannot prepare sync");
+    let sync_data = encode_sync(&sync).expect("Cannot encode sync");
+    let client = reqwest::blocking::Client::new();
+    let res = client
+        .post(url)
+        .body(sync_data)
+        .send()
+        .expect("Cannot send sync request");
+
+    if !res.status().is_success() {
+        println!("Error: {:?}", res.status().as_str());
+    }
+
+    let exchange_data = res.bytes().expect("Cannot read response body");
+    let exchange = decode_exchange(&exchange_data).expect("Cannot decode exchange");
+    import_exchange::import_exchange(db_path, exchange).expect("Cannot import exchange file");
 }
 
 fn main() {
@@ -134,5 +155,6 @@ fn main() {
             db_path,
             branch_name,
         } => run_delete_branch_command(&db_path, &branch_name),
+        Commands::SyncToServer { db_path, url } => sync_to_server(&db_path, &url),
     }
 }

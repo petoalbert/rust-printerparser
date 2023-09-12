@@ -140,9 +140,21 @@ pub enum Commands {
         #[arg(short, long)]
         db_path: String,
 
+        /// Path to the exchange file to be imported
         #[arg(short, long)]
         path_to_exchange: String,
     },
+
+    /// Sync to an external server
+    SyncToServer {
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Url of the external server
+        #[arg(short, long)]
+        url: String,
+    }
 }
 
 pub fn parse_args() -> Cli {
