@@ -95,18 +95,24 @@ fn run_delete_branch_command(db_path: &str, branch_name: &str) {
     delete_branch(db_path, branch_name).expect("Cannot delete branch")
 }
 
+#[inline]
+fn v1_sync_url(base: &str) -> String {
+    format!("{}/v1/sync", base)
+}
+
 fn sync_to_server(db_path: &str, url: &str) {
     let sync = prepare_sync(db_path).expect("Cannot prepare sync");
     let sync_data = encode_sync(&sync).expect("Cannot encode sync");
     let client = reqwest::blocking::Client::new();
     let res = client
-        .post(url)
+        .post(v1_sync_url(url))
         .body(sync_data)
         .send()
         .expect("Cannot send sync request");
 
     if !res.status().is_success() {
-        println!("Error: {:?}", res.status().as_str());
+        println!("Error: {}", res.status().as_str());
+        return;
     }
 
     let exchange_data = res.bytes().expect("Cannot read response body");
