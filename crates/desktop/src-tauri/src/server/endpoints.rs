@@ -6,10 +6,10 @@ use actix_web::{
 use log::error;
 use parserprinter::{
     api::{
-        commit_command::create_new_commit, get_current_branch, get_latest_commit,
-        init_command::init_db, list_branches_command::list_braches,
-        log_checkpoints_command::list_checkpoints, new_branch_command::create_new_branch,
-        restore_command::restore_checkpoint, switch_command::switch_branches,
+        commit_command::create_new_commit, get_current_branch, get_latest_commit, init_command,
+        list_branches_command::list_braches, log_checkpoints_command::list_checkpoints,
+        new_branch_command::create_new_branch, restore_command::restore_checkpoint,
+        switch_command::switch_branches,
     },
     db::db_ops::DBError,
 };
@@ -17,11 +17,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::serde_instances::DBErrorWrapper;
 
-fn init_if_not_exists(db_path: &str) -> Result<(), DBError> {
+fn error_if_not_exists(db_path: &str) -> Result<(), DBError> {
     let exists = std::path::Path::new(db_path).exists();
     if !exists {
-        let project_id = uuid::Uuid::new_v4().to_string();
-        init_db(db_path, &project_id)?;
+        return Err(DBError::Consistency("Database does not exist".to_owned()));
     }
     Ok(())
 }
@@ -66,7 +65,7 @@ pub async fn checkpoints(path: web::Path<(String, String)>) -> impl Responder {
     let (db_path, branch_name) = path.into_inner();
 
     let result =
-        init_if_not_exists(&db_path).and_then(|_| list_checkpoints(&db_path, &branch_name));
+        error_if_not_exists(&db_path).and_then(|_| list_checkpoints(&db_path, &branch_name));
 
     match result {
         Ok(checkpoints) => HttpResponse::Ok().json(
@@ -108,7 +107,7 @@ pub async fn restore(data: Json<RestorePayload>) -> impl Responder {
 #[get("/branches/{db_path}")]
 pub async fn branches(path: web::Path<(String,)>) -> impl Responder {
     let (db_path,) = path.into_inner();
-    let result = init_if_not_exists(&db_path).and_then(|_| list_braches(&db_path));
+    let result = error_if_not_exists(&db_path).and_then(|_| list_braches(&db_path));
     match result {
         Ok(branches) => HttpResponse::Ok().json(branches),
         Err(err) => {
@@ -158,8 +157,8 @@ pub async fn switch_branch(data: Json<SwitchBranchPayload>) -> impl Responder {
 #[get("/branches/current/{db_path}")]
 pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
     let (db_path,) = path.into_inner();
-    let result =
-        init_if_not_exists(&db_path).and_then(|_| get_current_branch::get_current_branch(&db_path));
+    let result = error_if_not_exists(&db_path)
+        .and_then(|_| get_current_branch::get_current_branch(&db_path));
     match result {
         Ok(branch) => HttpResponse::Ok().json(branch),
         Err(err) => {
@@ -173,9 +172,28 @@ pub async fn read_current_branch(path: web::Path<(String,)>) -> impl Responder {
 pub async fn read_latest_commit_hash(path: web::Path<(String,)>) -> impl Responder {
     let (db_path,) = path.into_inner();
     let result =
-        init_if_not_exists(&db_path).and_then(|_| get_latest_commit::get_latest_commit(&db_path));
+        error_if_not_exists(&db_path).and_then(|_| get_latest_commit::get_latest_commit(&db_path));
     match result {
         Ok(branch) => HttpResponse::Ok().json(branch),
+        Err(err) => {
+            error!("{}", err);
+            HttpResponse::BadRequest().json(DBErrorWrapper(err))
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct InitDBPayload {
+    db_path: String,
+    file_path: String,
+}
+
+#[post("/init")]
+pub async fn init_db(data: Json<InitDBPayload>) -> impl Responder {
+    let project_id = uuid::Uuid::new_v4().to_string();
+    let result = init_command::init_db(&data.db_path, &project_id, &data.file_path);
+    match result {
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(err) => {
             error!("{}", err);
             HttpResponse::BadRequest().json(DBErrorWrapper(err))

@@ -62,7 +62,7 @@ mod test {
     use crate::{
         api::{
             init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
-            test_utils,
+            test_utils::{init_db_from_simple_timeline, SimpleCommit, SimpleTimeline},
         },
         db::{
             db_ops::{Persistence, DB},
@@ -74,102 +74,58 @@ mod test {
     use super::import_exchange;
 
     #[test]
-    fn test_export_exchange() {
+    fn test_import_exchange() {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path, "my-cool-project");
+        /*
+        Start:
+          1 - 2 - 3
 
-        {
-            let mut db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
+        Result:
+                    x
+                  /
+          1 - 2 - 3 - 4
+           \
+              a - b
+        */
 
-            /*
-            Start:
-              1 - 2 - 3
-
-            Result:
-                        x
-                      /
-              1 - 2 - 3 - 4
-               \
-                  a - b
-            */
-
-            let blocks = vec![
-                BlockRecord {
-                    hash: String::from("aaa"),
-                    data: vec![1, 1, 1],
-                },
-                BlockRecord {
-                    hash: String::from("bbb"),
-                    data: vec![2, 2, 2],
-                },
-                BlockRecord {
-                    hash: String::from("ccc"),
-                    data: vec![3, 3, 3],
-                },
-                BlockRecord {
-                    hash: String::from("ddd"),
-                    data: vec![4, 4, 4],
-                },
-            ];
-
-            db.write_blocks(&blocks).expect("cannot write blocks");
-
-            db.write_blocks_str("1", "aaa,bbb").unwrap();
-            db.write_blocks_str("2", "bbb,ccc").unwrap();
-            db.write_blocks_str("3", "ccc,ddd").unwrap();
-
-            db.execute_in_transaction(|tx| {
-                Persistence::write_commit(
-                    tx,
-                    Commit {
+        init_db_from_simple_timeline(
+            tmp_db_path,
+            SimpleTimeline {
+                project_id: String::from("a"),
+                author: "test".to_owned(),
+                blocks: vec![
+                    String::from("aaa"),
+                    String::from("bbb"),
+                    String::from("ccc"),
+                    String::from("ddd"),
+                ],
+                commits: vec![
+                    SimpleCommit {
                         hash: "1".to_owned(),
-                        prev_commit_hash: String::from(INITIAL_COMMIT_HASH),
-                        project_id: "a".to_owned(),
+                        prev_hash: String::from(INITIAL_COMMIT_HASH),
                         branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
-                        author: "test".to_owned(),
-                        date: 1,
-                        header: vec![],
                         blocks: "aaa,bbb".to_owned(),
                     },
-                )?;
-
-                Persistence::write_commit(
-                    tx,
-                    Commit {
+                    SimpleCommit {
                         hash: "2".to_owned(),
-                        prev_commit_hash: "1".to_owned(),
-                        project_id: "a".to_owned(),
+                        prev_hash: "1".to_owned(),
                         branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
-                        author: "test".to_owned(),
-                        date: 2,
-                        header: vec![],
                         blocks: "bbb,ccc".to_owned(),
                     },
-                )?;
-
-                Persistence::write_commit(
-                    tx,
-                    Commit {
+                    SimpleCommit {
                         hash: "3".to_owned(),
-                        prev_commit_hash: "2".to_owned(),
-                        project_id: "a".to_owned(),
+                        prev_hash: "2".to_owned(),
                         branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
-                        author: "test".to_owned(),
-                        date: 3,
-                        header: vec![],
                         blocks: "ccc,ddd".to_owned(),
                     },
-                )?;
-
-                Ok(())
-            })
-            .expect("Cannot execute transaction");
-        }
+                ],
+            },
+        );
 
         let exchange = Exchange {
             commits: vec![
@@ -255,7 +211,7 @@ mod test {
 
         let all_commit_hashes: Vec<String> = all_commits.iter().map(|c| c.hash.clone()).collect();
 
-        assert_eq!(all_commit_hashes, vec!["1", "2", "3", "4", "a", "x", "b"]); // all commits are present
+        assert_eq!(all_commit_hashes, vec!["4", "a", "x", "b", "1", "2", "3"]); // all commits are present
 
         let mut all_branches: Vec<String> = all_commits.iter().map(|c| c.branch.clone()).collect();
 

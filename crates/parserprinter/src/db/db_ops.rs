@@ -589,7 +589,7 @@ mod tests {
 
     use crate::api::{
         init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
-        test_utils,
+        test_utils::{init_db_from_simple_timeline, SimpleCommit, SimpleTimeline},
     };
 
     use super::*;
@@ -598,8 +598,6 @@ mod tests {
     fn test_read_descendants_of_commit() {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
-
-        test_utils::init_db(tmp_path, "my-cool-project");
 
         let mut db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
@@ -790,10 +788,6 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_path, "my-cool-project");
-
-        let mut db = Persistence::open(tmp_path).expect("Cannot open test DB");
-
         /*
           alt1           x
                         /
@@ -801,126 +795,75 @@ mod tests {
                 \
           alt2    a - b
         */
-        db.write_blocks_str("1", "aaa").unwrap();
-        db.write_blocks_str("2", "bbb").unwrap();
-        db.write_blocks_str("3", "ccc").unwrap();
-        db.write_blocks_str("4", "ddd").unwrap();
-        db.write_blocks_str("a", "eee").unwrap();
-        db.write_blocks_str("b", "fff").unwrap();
-        db.write_blocks_str("x", "xxx").unwrap();
-        db.execute_in_transaction(|tx| {
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "1".to_owned(),
-                    prev_commit_hash: String::from(INITIAL_COMMIT_HASH),
-                    project_id: "a".to_owned(),
-                    branch: String::from(MAIN_BRANCH_NAME),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 1,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
+        init_db_from_simple_timeline(
+            tmp_path,
+            SimpleTimeline {
+                project_id: String::from("a"),
+                author: "test".to_owned(),
+                blocks: vec![
+                    String::from("aaa"),
+                    String::from("bbb"),
+                    String::from("ccc"),
+                    String::from("ddd"),
+                    String::from("eee"),
+                    String::from("fff"),
+                    String::from("ggg"),
+                ],
+                commits: vec![
+                    SimpleCommit {
+                        hash: "1".to_owned(),
+                        prev_hash: String::from(INITIAL_COMMIT_HASH),
+                        branch: String::from("main"),
+                        message: "hi".to_owned(),
+                        blocks: "aaa,bbb".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "2".to_owned(),
+                        prev_hash: "1".to_owned(),
+                        branch: String::from("main"),
+                        message: "hi".to_owned(),
+                        blocks: "bbb,ccc".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "3".to_owned(),
+                        prev_hash: "2".to_owned(),
+                        branch: String::from("main"),
+                        message: "hi".to_owned(),
+                        blocks: "ccc,ddd".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "4".to_owned(),
+                        prev_hash: "3".to_owned(),
+                        branch: String::from("main"),
+                        message: "hi".to_owned(),
+                        blocks: "ddd,eee".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "a".to_owned(),
+                        prev_hash: "1".to_owned(),
+                        branch: String::from("alt2"),
+                        message: "hi".to_owned(),
+                        blocks: "eee,fff".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "b".to_owned(),
+                        prev_hash: "a".to_owned(),
+                        branch: String::from("alt2"),
+                        message: "hi".to_owned(),
+                        blocks: "fff,111".to_owned(),
+                    },
+                    SimpleCommit {
+                        hash: "x".to_owned(),
+                        prev_hash: "3".to_owned(),
+                        branch: String::from("alt1"),
+                        message: "hi".to_owned(),
+                        blocks: "222,aaa".to_owned(),
+                    },
+                ],
+            },
+        );
 
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "2".to_owned(),
-                    prev_commit_hash: "1".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: String::from(MAIN_BRANCH_NAME),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 2,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "3".to_owned(),
-                    prev_commit_hash: "2".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: String::from(MAIN_BRANCH_NAME),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 3,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "4".to_owned(),
-                    prev_commit_hash: "3".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: String::from(MAIN_BRANCH_NAME),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 4,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "a".to_owned(),
-                    prev_commit_hash: "1".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: "alt2".to_owned(),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 10,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "b".to_owned(),
-                    prev_commit_hash: "a".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: String::from(MAIN_BRANCH_NAME),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 11,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_commit(
-                tx,
-                Commit {
-                    hash: "x".to_owned(),
-                    prev_commit_hash: "3".to_owned(),
-                    project_id: "a".to_owned(),
-                    branch: "alt1".to_owned(),
-                    message: "hi".to_owned(),
-                    author: "test".to_owned(),
-                    date: 10,
-                    header: vec![],
-                    blocks: "".to_owned(),
-                },
-            )?;
-
-            Persistence::write_branch_tip(tx, MAIN_BRANCH_NAME, "4")?;
-            Persistence::write_branch_tip(tx, "alt1", "x")?;
-            Persistence::write_branch_tip(tx, "alt2", "b")?;
-
-            Ok(())
-        })
-        .expect("Cannot execute transaction");
+        let mut db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
         db.execute_in_transaction(|tx| Persistence::delete_branch_with_commits(tx, "alt2"))
             .expect("cannot delete");

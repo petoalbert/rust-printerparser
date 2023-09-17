@@ -31,10 +31,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::{
-            common::read_latest_commit_hash_on_branch, init_command::INITIAL_COMMIT_HASH,
-            test_utils,
-        },
+        api::{common::read_latest_commit_hash_on_branch, test_utils},
         db::db_ops::{Persistence, DB},
     };
 
@@ -45,11 +42,11 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path, "my-cool-project");
+        test_utils::init_db_from_file(tmp_db_path, "my-cool-project", "data/untitled.blend");
 
         create_new_branch(tmp_db_path, "dev").unwrap();
 
-        assert_eq!(test_utils::list_checkpoints(tmp_db_path, "dev").len(), 0);
+        assert_eq!(test_utils::list_checkpoints(tmp_db_path, "dev").len(), 1);
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
@@ -67,7 +64,7 @@ mod test {
             .expect("Cannot read latest commit");
 
         // the latest commit hash stays the same
-        assert_eq!(latest_commit_name, INITIAL_COMMIT_HASH);
+        assert_eq!(latest_commit_name, "a5f92d0a988085ed66c9dcdccc7b9c90");
     }
 
     #[test]
@@ -75,24 +72,25 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path, "my-cool-project");
+        test_utils::init_db_from_file(tmp_db_path, "my-cool-project", "data/untitled.blend");
 
         // a commit to `main`
-        test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
+        test_utils::commit(tmp_db_path, "Commit", "data/untitled_2.blend");
 
         create_new_branch(tmp_db_path, "dev").unwrap();
 
-        // a commit to `other`
-        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
+        // a commit to `dev`
+        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_3.blend");
 
         let commits = test_utils::list_checkpoints(tmp_db_path, "dev");
 
-        assert_eq!(commits.len(), 2);
+        assert_eq!(commits.len(), 3);
 
         // latest commit first
         assert_eq!(commits.get(0).unwrap().branch, "dev");
         assert_eq!(commits.get(0).unwrap().message, "Commit 2");
         assert_eq!(commits.get(1).unwrap().branch, "main");
         assert_eq!(commits.get(1).unwrap().message, "Commit");
+        assert_eq!(commits.get(2).unwrap().branch, "main");
     }
 }

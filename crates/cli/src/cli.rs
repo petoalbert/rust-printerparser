@@ -117,6 +117,10 @@ pub enum Commands {
         /// Path to the blend file DB
         #[arg(short, long)]
         db_path: String,
+
+        /// Path to the blender file to create the DB from
+        #[arg(short, long)]
+        file_path: String,
     },
 
     /// Export descendants of a commit

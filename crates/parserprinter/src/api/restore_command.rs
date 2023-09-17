@@ -78,24 +78,24 @@ mod test {
         let tmp_dir = TempDir::new().expect("Cannot create temp dir");
         let tmp_db_path = tmp_dir.path().to_str().expect("Cannot get temp dir path");
 
-        test_utils::init_db(tmp_db_path, "my-cool-project");
+        test_utils::init_db_from_file(tmp_db_path, "my-cool-project", "data/untitled.blend");
 
-        test_utils::commit(tmp_db_path, "Commit", "data/untitled.blend");
-        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_2.blend");
+        test_utils::commit(tmp_db_path, "Commit", "data/untitled_2.blend");
+        test_utils::commit(tmp_db_path, "Commit 2", "data/untitled_3.blend");
 
         let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
 
         restore_checkpoint(
             tmp_blend_path.path().to_str().unwrap(),
             tmp_db_path,
-            "a5f92d0a988085ed66c9dcdccc7b9c90",
+            "b637ec695e10bed0ce06279d1dc46717",
         )
         .expect("Cannot restore checkpoint");
 
         // Number of commits stays the same
         assert_eq!(
             test_utils::list_checkpoints(tmp_db_path, MAIN_BRANCH_NAME).len(),
-            2
+            3
         );
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
@@ -112,10 +112,10 @@ mod test {
             .expect("Cannot read latest commit");
 
         // The latest commit hash is updated to the hash of the restored commit
-        assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
+        assert_eq!(latest_commit_hash, "b637ec695e10bed0ce06279d1dc46717");
 
         // The tip of `main` stays the same
         let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
-        assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
+        assert_eq!(main_tip, "d9e8eb09f8270ad5326de946d951433a");
     }
 }

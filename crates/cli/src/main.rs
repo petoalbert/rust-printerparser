@@ -75,9 +75,9 @@ fn run_get_current_branch(db_path: &str) {
     }
 }
 
-fn run_init_command(db_path: &str) {
+fn run_init_command(db_path: &str, file_path: &str) {
     let project_id = uuid::Uuid::new_v4().to_string();
-    print_error_discard_rest(init_db(db_path, &project_id));
+    print_error_discard_rest(init_db(db_path, &project_id, file_path));
 }
 
 fn run_export_command(db_path: &str, root_hash: &str, path_to_file: &str) {
@@ -147,7 +147,7 @@ fn main() {
             file_path,
         } => run_switch_branches(&db_path, &file_path, &branch),
         Commands::LogCheckpoints { db_path, branch } => print_checkpoints(&db_path, &branch),
-        Commands::Init { db_path } => run_init_command(&db_path),
+        Commands::Init { db_path, file_path } => run_init_command(&db_path, &file_path),
         Commands::Export {
             db_path,
             from_commit,

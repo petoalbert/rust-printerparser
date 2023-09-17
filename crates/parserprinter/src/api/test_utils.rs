@@ -1,8 +1,8 @@
 #[cfg(test)]
-pub fn init_db(db_path: &str, project_id: &str) {
+pub fn init_db_from_file(db_path: &str, project_id: &str, blend_file_path: &str) {
     use super::init_command::init_db;
 
-    init_db(db_path, project_id).expect("Cannot init DB")
+    init_db(db_path, project_id, blend_file_path).expect("Cannot init DB")
 }
 
 #[cfg(test)]
@@ -22,7 +22,6 @@ pub fn new_branch(db_path: &str, name: &str) {
 
 #[cfg(test)]
 use crate::db::db_ops::ShortCommitRecord;
-use crate::db::structs::{BlockRecord, Commit};
 
 #[cfg(test)]
 pub fn list_checkpoints(db_path: &str, branch: &str) -> Vec<ShortCommitRecord> {
@@ -32,27 +31,89 @@ pub fn list_checkpoints(db_path: &str, branch: &str) -> Vec<ShortCommitRecord> {
 }
 
 #[cfg(test)]
-struct SimpleCommit {
-    hash: String,
-    prev_hash: String,
-    branch: String,
-    message: String,
-    blocks: String,
+pub struct SimpleCommit {
+    pub hash: String,
+    pub prev_hash: String,
+    pub branch: String,
+    pub message: String,
+    pub blocks: String,
 }
 
 #[cfg(test)]
-struct SimpleTimeline {
-    project_id: String,
-    author: String,
-    blocks: Vec<String>,
+pub struct SimpleTimeline {
+    pub project_id: String,
+    pub author: String,
+    pub blocks: Vec<String>,
+    pub commits: Vec<SimpleCommit>,
 }
+
 #[cfg(test)]
-struct SimpleTimelineResult {
-    commits: Vec<Commit>,
-    blocks: Vec<BlockRecord>,
+pub fn init_db_from_simple_timeline(db_path: &str, simple_timeline: SimpleTimeline) {
+    use crate::{
+        api::init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+        db::{
+            db_ops::{Persistence, DB},
+            structs::{BlockRecord, Commit},
+        },
+    };
+
+    let mut db = Persistence::open(db_path).expect("cannot open DB");
+
+    let block_records: Vec<BlockRecord> = simple_timeline
+        .blocks
+        .into_iter()
+        .map(|b| BlockRecord {
+            hash: b.clone(),
+            data: b.into_bytes(),
+        })
+        .collect();
+
+    db.write_blocks(&block_records)
+        .expect("cannot write blocks");
+
+    let mut last_commit_hash = String::from(INITIAL_COMMIT_HASH);
+    let mut last_branch_name = String::from(MAIN_BRANCH_NAME);
+    let mut date: u64 = 314;
+    for commit in simple_timeline.commits {
+        db.write_blocks_str(&commit.hash, &commit.blocks)
+            .expect("Cannot write blocks string");
+
+        db.execute_in_transaction(|tx| {
+            let this_hash = commit.hash.clone();
+            let this_branch_name = commit.branch.clone();
+            Persistence::write_branch_tip(tx, &this_branch_name, &this_hash)
+                .expect("cannot write branch tip");
+
+            Persistence::write_current_branch_name(tx, &last_branch_name)
+                .expect("Cannot write current branch");
+
+            Persistence::write_commit(
+                tx,
+                Commit {
+                    hash: commit.hash,
+                    prev_commit_hash: commit.prev_hash,
+                    project_id: simple_timeline.project_id.clone(),
+                    branch: commit.branch,
+                    message: commit.message,
+                    author: simple_timeline.author.clone(),
+                    date,
+                    header: vec![1, 2, 3],
+                    blocks: commit.blocks,
+                },
+            )
+            .expect("cannot write commits");
+            date += 1;
+            last_commit_hash = this_hash;
+            last_branch_name = this_branch_name;
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    db.execute_in_transaction(|tx| {
+        Persistence::write_remote_branch_tip(tx, MAIN_BRANCH_NAME, &last_commit_hash)?;
+        Persistence::write_project_id(tx, &simple_timeline.project_id)?;
+        Ok(())
+    })
+    .expect("cannot set pointers");
 }
-
-// #[cfg(test)]
-// pub fn from_simple_timeline(simple_timeline: SimpleTimeline) {
-
-// }
