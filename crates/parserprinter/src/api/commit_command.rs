@@ -89,7 +89,7 @@ pub fn create_new_commit(
         md5::compute(&blocks_str)
     });
 
-    let name = conn.read_config("name")?.unwrap_or("Anon".to_owned());
+    let name = conn.read_name()?.unwrap_or("Anon".to_owned());
 
     let current_brach_name = conn.read_current_branch_name()?;
 

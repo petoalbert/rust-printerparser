@@ -28,9 +28,6 @@ impl Display for DBError {
 pub trait DB: Sized {
     fn open(path: &str) -> Result<Self, DBError>;
 
-    fn read_config(&self, key: &str) -> Result<Option<String>, DBError>;
-    fn write_config(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError>;
-
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError>;
     fn read_blocks(&self, hashes: Vec<String>) -> Result<Vec<BlockRecord>, DBError>;
 
@@ -73,6 +70,9 @@ pub trait DB: Sized {
     fn read_project_id(&self) -> Result<String, DBError>;
     fn write_project_id(tx: &rusqlite::Transaction, project_id: &str) -> Result<(), DBError>;
 
+    fn read_name(&self) -> Result<Option<String>, DBError>;
+    fn write_name(tx: &rusqlite::Transaction, name: &str) -> Result<(), DBError>;
+
     fn delete_branch_with_commits(
         tx: &rusqlite::Transaction,
         branch_name: &str,
@@ -113,6 +113,11 @@ fn project_id_key() -> String {
     "PROJECT_ID".to_string()
 }
 
+#[inline]
+fn user_name_key() -> String {
+    "USER_NAME".to_string()
+}
+
 fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError> {
     tx.execute(
         "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
@@ -120,6 +125,23 @@ fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Res
     )
     .map_err(|_| DBError::Error(format!("Cannot set {:?} for {:?}", value, key)))
     .map(|_| ())
+}
+
+fn read_config_inner(conn: rusqlite::Connection, key: &str) -> Result<Option<String>, DBError> {
+    let mut stmt = conn
+        .prepare("SELECT value FROM config WHERE key = ?1")
+        .map_err(|_| DBError::Fundamental("Cannot prepare read commits query".to_owned()))?;
+
+    let mut rows = stmt
+        .query([key])
+        .map_err(|_| DBError::Fundamental("Cannot query config table".to_owned()))?;
+
+    match rows.next() {
+        Ok(Some(row)) => row
+            .get(0)
+            .map_err(|_| DBError::Fundamental("Cannot read config key".to_owned())),
+        _ => Ok(None),
+    }
 }
 
 fn get_blocks_by_hash(rocks_db: &rocksdb::DB, hash: &str) -> Result<String, DBError> {
@@ -190,28 +212,6 @@ impl DB for Persistence {
             rocks_db,
             sqlite_db,
         })
-    }
-
-    fn read_config(&self, key: &str) -> Result<Option<String>, DBError> {
-        let mut stmt = self
-            .sqlite_db
-            .prepare("SELECT value FROM config WHERE key = ?1")
-            .map_err(|_| DBError::Fundamental("Cannot prepare read commits query".to_owned()))?;
-
-        let mut rows = stmt
-            .query([key])
-            .map_err(|_| DBError::Fundamental("Cannot query config table".to_owned()))?;
-
-        match rows.next() {
-            Ok(Some(row)) => row
-                .get(0)
-                .map_err(|_| DBError::Fundamental("Cannot read config key".to_owned())),
-            _ => Ok(None),
-        }
-    }
-
-    fn write_config(tx: &rusqlite::Transaction, key: &str, value: &str) -> Result<(), DBError> {
-        write_config_inner(tx, key, value)
     }
 
     fn write_blocks(&self, blocks: &[BlockRecord]) -> Result<(), DBError> {
@@ -374,7 +374,7 @@ impl DB for Persistence {
     }
 
     fn read_current_branch_name(&self) -> Result<String, DBError> {
-        self.read_config(&current_branch_name_key())
+        read_config_inner(self.sqlite_db, &current_branch_name_key())
             .map_err(|_| DBError::Error("Cannot read current branch name".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -497,7 +497,7 @@ impl DB for Persistence {
     }
 
     fn read_current_latest_commit(&self) -> Result<String, DBError> {
-        self.read_config(&current_latest_commit_key())
+        read_config_inner(self.sqlite_db, &current_latest_commit_key())
             .map_err(|_| DBError::Error("Cannot read latest commit hash".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -528,7 +528,7 @@ impl DB for Persistence {
     }
 
     fn read_project_id(&self) -> Result<String, DBError> {
-        self.read_config(&project_id_key())
+        read_config_inner(self.sqlite_db, &project_id_key())
             .map_err(|_| DBError::Error("Cannot read project id".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -573,6 +573,14 @@ impl DB for Persistence {
             .map_err(|e| DBError::Error(format!("Cannot execute statement: {:?}", e)))?;
 
         Ok(())
+    }
+
+    fn read_name(&self) -> Result<Option<String>, DBError> {
+        read_config_inner(self.sqlite_db, &user_name_key())
+    }
+
+    fn write_name(tx: &rusqlite::Transaction, name: &str) -> Result<(), DBError> {
+        write_config_inner(tx, &user_name_key(), name)
     }
 }
 
