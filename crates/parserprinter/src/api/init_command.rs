@@ -20,6 +20,8 @@ pub fn init_db(db_path: &str, project_id: &str, path_to_blend: &str) -> Result<(
 
     db.write_blocks_str(&blend_data.hash, &blend_data.blocks)?;
 
+    db.write_blocks(&blend_data.block_data)?;
+
     db.execute_in_transaction(|tx| {
         Persistence::write_branch_tip(tx, MAIN_BRANCH_NAME, &blend_data.hash)?;
 
