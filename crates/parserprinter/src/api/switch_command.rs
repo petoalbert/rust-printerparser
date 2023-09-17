@@ -34,7 +34,7 @@ mod test {
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::{
-        api::test_utils,
+        api::{init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME}, test_utils},
         db::db_ops::{Persistence, DB},
     };
 
@@ -57,10 +57,10 @@ mod test {
         // no new branch is added
         assert_eq!(branches, vec!["main"]);
 
-        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
+        let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
 
         // tip of main stays the same
-        assert_eq!(main_tip, "initial");
+        assert_eq!(main_tip, INITIAL_COMMIT_HASH);
 
         let current_branch_name = db
             .read_current_branch_name()
@@ -74,7 +74,7 @@ mod test {
             .expect("Cannot read latest commit");
 
         // The latest commit hash stays the same
-        assert_eq!(latest_commit_hash, "initial");
+        assert_eq!(latest_commit_hash, INITIAL_COMMIT_HASH);
     }
 
     #[test]
@@ -94,20 +94,20 @@ mod test {
 
         let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
 
-        switch_branches(tmp_db_path, "main", tmp_blend_path.path().to_str().unwrap())
+        switch_branches(tmp_db_path, MAIN_BRANCH_NAME, tmp_blend_path.path().to_str().unwrap())
             .expect("Cannot switch branches");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
         // current branch name is set to the checked out branch
         let current_branch_name = db.read_current_branch_name().unwrap();
-        assert_eq!(current_branch_name, "main");
+        assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         // latest commit hash is set to the tip of the checked out branch
         let lastest_commit_hash = db.read_current_latest_commit().unwrap();
         assert_eq!(lastest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
-        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
+        let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
         assert_eq!(lastest_commit_hash, main_tip);
     }
 }

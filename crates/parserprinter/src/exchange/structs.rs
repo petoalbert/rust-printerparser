@@ -35,6 +35,7 @@ pub fn encode_sync(sync: &Sync) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod test {
     use crate::{
+        api::init_command::MAIN_BRANCH_NAME,
         db::structs::{BlockRecord, Commit},
         exchange::structs::decode_exchange,
     };
@@ -49,7 +50,7 @@ mod test {
                     hash: String::from("abc123"),
                     prev_commit_hash: String::from("def456"),
                     project_id: String::from("proj789"),
-                    branch: String::from("main"),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: String::from("Initial commit"),
                     author: String::from("John Doe"),
                     date: 1632870400, // Unix timestamp
@@ -60,7 +61,7 @@ mod test {
                     hash: String::from("qwe234"),
                     prev_commit_hash: String::from("abc123"),
                     project_id: String::from("proj78"),
-                    branch: String::from("main"),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: String::from("Next commit"),
                     author: String::from("John Doe too"),
                     date: 1632870410, // Unix timestamp

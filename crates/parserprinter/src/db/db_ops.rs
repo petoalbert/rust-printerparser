@@ -38,8 +38,10 @@ pub trait DB: Sized {
     fn write_blocks_str(&self, hash: &str, blocks_str: &str) -> Result<(), DBError>;
     fn read_commit(&self, hash: &str) -> Result<Option<Commit>, DBError>;
 
-    fn read_ancestors_of_commit(&self, brach_name: &str)
-        -> Result<Vec<ShortCommitRecord>, DBError>;
+    fn read_ancestors_of_commit(
+        &self,
+        starting_from_hash: &str,
+    ) -> Result<Vec<ShortCommitRecord>, DBError>;
 
     fn read_descendants_of_commit(&self, hash: &str) -> Result<Vec<Commit>, DBError>;
 
@@ -578,7 +580,10 @@ impl DB for Persistence {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::api::test_utils;
+    use crate::api::{
+        init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+        test_utils,
+    };
 
     use super::*;
 
@@ -610,9 +615,9 @@ mod tests {
                 tx,
                 Commit {
                     hash: "1".to_owned(),
-                    prev_commit_hash: "initial".to_owned(),
+                    prev_commit_hash: String::from(INITIAL_COMMIT_HASH),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 1,
@@ -627,7 +632,7 @@ mod tests {
                     hash: "2".to_owned(),
                     prev_commit_hash: "1".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 2,
@@ -642,7 +647,7 @@ mod tests {
                     hash: "3".to_owned(),
                     prev_commit_hash: "2".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 3,
@@ -657,7 +662,7 @@ mod tests {
                     hash: "4".to_owned(),
                     prev_commit_hash: "3".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 4,
@@ -672,7 +677,7 @@ mod tests {
                     hash: "a".to_owned(),
                     prev_commit_hash: "1".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 10,
@@ -687,7 +692,7 @@ mod tests {
                     hash: "b".to_owned(),
                     prev_commit_hash: "a".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 11,
@@ -702,7 +707,7 @@ mod tests {
                     hash: "x".to_owned(),
                     prev_commit_hash: "3".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 10,
@@ -801,9 +806,9 @@ mod tests {
                 tx,
                 Commit {
                     hash: "1".to_owned(),
-                    prev_commit_hash: "initial".to_owned(),
+                    prev_commit_hash: String::from(INITIAL_COMMIT_HASH),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 1,
@@ -818,7 +823,7 @@ mod tests {
                     hash: "2".to_owned(),
                     prev_commit_hash: "1".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 2,
@@ -833,7 +838,7 @@ mod tests {
                     hash: "3".to_owned(),
                     prev_commit_hash: "2".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 3,
@@ -848,7 +853,7 @@ mod tests {
                     hash: "4".to_owned(),
                     prev_commit_hash: "3".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 4,
@@ -878,7 +883,7 @@ mod tests {
                     hash: "b".to_owned(),
                     prev_commit_hash: "a".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 11,
@@ -902,7 +907,7 @@ mod tests {
                 },
             )?;
 
-            Persistence::write_branch_tip(tx, "main", "4")?;
+            Persistence::write_branch_tip(tx, MAIN_BRANCH_NAME, "4")?;
             Persistence::write_branch_tip(tx, "alt1", "x")?;
             Persistence::write_branch_tip(tx, "alt2", "b")?;
 

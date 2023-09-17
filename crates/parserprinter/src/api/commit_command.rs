@@ -151,7 +151,10 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::test_utils,
+        api::{
+            init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+            test_utils,
+        },
         db::db_ops::{Persistence, DB},
     };
 
@@ -167,7 +170,10 @@ mod test {
         create_new_commit("data/untitled.blend", tmp_path, Some("Message".to_owned())).unwrap();
 
         // Creates exactly one commit
-        assert_eq!(test_utils::list_checkpoints(tmp_path, "main").len(), 1);
+        assert_eq!(
+            test_utils::list_checkpoints(tmp_path, MAIN_BRANCH_NAME).len(),
+            1
+        );
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
@@ -180,10 +186,10 @@ mod test {
         // commit.date omitted, not stable
         // commit.header omitted, not interesting enough
         assert_eq!(commit.author, "Anon");
-        assert_eq!(commit.branch, "main");
+        assert_eq!(commit.branch, MAIN_BRANCH_NAME);
         assert_eq!(commit.hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
         assert_eq!(commit.message, "Message");
-        assert_eq!(commit.prev_commit_hash, "initial");
+        assert_eq!(commit.prev_commit_hash, INITIAL_COMMIT_HASH);
         assert_eq!(commit.project_id, "my-cool-project");
 
         let current_branch_name = db
@@ -191,7 +197,7 @@ mod test {
             .expect("Cannot read current branch name");
 
         // The current branch name stays the same
-        assert_eq!(current_branch_name, "main");
+        assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         let latest_commit_hash = db
             .read_current_latest_commit()
@@ -201,7 +207,7 @@ mod test {
         assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
         // The tip of `main` is updated to the hash of the new commit
-        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
+        let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
         assert_eq!(main_tip, "a5f92d0a988085ed66c9dcdccc7b9c90");
     }
 
@@ -220,7 +226,10 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!(test_utils::list_checkpoints(tmp_path, "main").len(), 2);
+        assert_eq!(
+            test_utils::list_checkpoints(tmp_path, MAIN_BRANCH_NAME).len(),
+            2
+        );
 
         let db = Persistence::open(tmp_path).expect("Cannot open test DB");
 
@@ -229,7 +238,7 @@ mod test {
             .expect("Cannot read current branch name");
 
         // The current branch name stays the same
-        assert_eq!(current_branch_name, "main");
+        assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         let latest_commit_hash = db
             .read_current_latest_commit()
@@ -239,7 +248,7 @@ mod test {
         assert_eq!(latest_commit_hash, "b637ec695e10bed0ce06279d1dc46717");
 
         // The tip of `main` is updated to the hash of the new commit
-        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
+        let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
         assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
     }
 }

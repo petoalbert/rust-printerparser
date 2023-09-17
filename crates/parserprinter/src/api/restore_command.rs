@@ -67,7 +67,7 @@ mod test {
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::{
-        api::test_utils,
+        api::{test_utils, init_command::MAIN_BRANCH_NAME},
         db::db_ops::{Persistence, DB},
     };
 
@@ -93,7 +93,7 @@ mod test {
         .expect("Cannot restore checkpoint");
 
         // Number of commits stays the same
-        assert_eq!(test_utils::list_checkpoints(tmp_db_path, "main").len(), 2);
+        assert_eq!(test_utils::list_checkpoints(tmp_db_path, MAIN_BRANCH_NAME).len(), 2);
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
@@ -102,7 +102,7 @@ mod test {
             .expect("Cannot read current branch name");
 
         // The current branch name stays the same
-        assert_eq!(current_branch_name, "main");
+        assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         let latest_commit_hash = db
             .read_current_latest_commit()
@@ -112,7 +112,7 @@ mod test {
         assert_eq!(latest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
         // The tip of `main` stays the same
-        let main_tip = db.read_branch_tip("main").unwrap().unwrap();
+        let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();
         assert_eq!(main_tip, "b637ec695e10bed0ce06279d1dc46717");
     }
 }

@@ -60,7 +60,10 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::test_utils,
+        api::{
+            init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+            test_utils,
+        },
         db::{
             db_ops::{Persistence, DB},
             structs::{BlockRecord, Commit},
@@ -122,9 +125,9 @@ mod test {
                     tx,
                     Commit {
                         hash: "1".to_owned(),
-                        prev_commit_hash: "initial".to_owned(),
+                        prev_commit_hash: String::from(INITIAL_COMMIT_HASH),
                         project_id: "a".to_owned(),
-                        branch: "main".to_owned(),
+                        branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
                         author: "test".to_owned(),
                         date: 1,
@@ -139,7 +142,7 @@ mod test {
                         hash: "2".to_owned(),
                         prev_commit_hash: "1".to_owned(),
                         project_id: "a".to_owned(),
-                        branch: "main".to_owned(),
+                        branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
                         author: "test".to_owned(),
                         date: 2,
@@ -154,7 +157,7 @@ mod test {
                         hash: "3".to_owned(),
                         prev_commit_hash: "2".to_owned(),
                         project_id: "a".to_owned(),
-                        branch: "main".to_owned(),
+                        branch: String::from(MAIN_BRANCH_NAME),
                         message: "hi".to_owned(),
                         author: "test".to_owned(),
                         date: 3,
@@ -174,7 +177,7 @@ mod test {
                     hash: "4".to_owned(),
                     prev_commit_hash: "3".to_owned(),
                     project_id: "a".to_owned(),
-                    branch: "main".to_owned(),
+                    branch: String::from(MAIN_BRANCH_NAME),
                     message: "hi".to_owned(),
                     author: "test".to_owned(),
                     date: 4,
@@ -269,7 +272,7 @@ mod test {
         assert_eq!(ab_tip, "b");
 
         let main_tip = db
-            .read_branch_tip("main")
+            .read_branch_tip(MAIN_BRANCH_NAME)
             .expect("Cannot read tip for branch 'main'")
             .expect("Branch 'main' should have a tip");
         assert_eq!(main_tip, "4");

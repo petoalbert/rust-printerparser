@@ -1,6 +1,6 @@
 use crate::db::db_ops::{DBError, Persistence, DB};
 
-use super::invariants::check_current_branch_current_commit_set;
+use super::{invariants::check_current_branch_current_commit_set, init_command::MAIN_BRANCH_NAME};
 
 pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBError> {
     let mut db = Persistence::open(db_path)?;
@@ -9,7 +9,7 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBE
 
     let current_brach_name = db.read_current_branch_name()?;
 
-    if current_brach_name != "main" {
+    if current_brach_name != MAIN_BRANCH_NAME {
         return Err(DBError::Error(
             "New branches can only be created if main is the current branch".to_owned(),
         ));
@@ -35,7 +35,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::test_utils,
+        api::{init_command::INITIAL_COMMIT_HASH, test_utils},
         db::db_ops::{Persistence, DB},
     };
 
@@ -69,7 +69,7 @@ mod test {
             .expect("Cannot read latest commit");
 
         // the latest commit hash stays the same
-        assert_eq!(latest_commit_name, "initial");
+        assert_eq!(latest_commit_name, INITIAL_COMMIT_HASH);
     }
 
     #[test]
