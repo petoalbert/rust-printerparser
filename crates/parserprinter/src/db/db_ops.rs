@@ -48,8 +48,8 @@ pub trait DB: Sized {
         brach_name: &str,
     ) -> Result<(), DBError>;
 
-    fn read_current_latest_commit(&self) -> Result<String, DBError>;
-    fn write_current_latest_commit(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError>;
+    fn read_current_commit_pointer(&self) -> Result<String, DBError>;
+    fn write_current_commit_pointer(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError>;
 
     fn read_all_branches(&self) -> Result<Vec<String>, DBError>;
 
@@ -496,18 +496,17 @@ impl DB for Persistence {
         .map(|_| ())
     }
 
-    fn read_current_latest_commit(&self) -> Result<String, DBError> {
+    fn read_current_commit_pointer(&self) -> Result<String, DBError> {
         read_config_inner(&self.sqlite_db, &current_latest_commit_key())
-            .map_err(|_| DBError::Error("Cannot read latest commit hash".to_owned()))
+            .map_err(|_| DBError::Error("Cannot read current commit pointer".to_owned()))
             .and_then(|v| {
-                v.map_or(
-                    Err(DBError::Error("Cannot read latest commit hash".to_owned())),
-                    Ok,
-                )
+                v.ok_or(DBError::Consistency(
+                    "Cannot current commit pointer not set".to_owned(),
+                ))
             })
     }
 
-    fn write_current_latest_commit(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError> {
+    fn write_current_commit_pointer(tx: &rusqlite::Transaction, hash: &str) -> Result<(), DBError> {
         write_config_inner(tx, &current_latest_commit_key(), hash)
             .map_err(|e| DBError::Error(format!("Cannot write latest commit hash: {:?}", e)))
     }

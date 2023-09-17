@@ -53,7 +53,7 @@ pub fn restore_checkpoint(file_path: &str, db_path: &str, hash: &str) -> Result<
 
     conn.execute_in_transaction(|tx| {
         Persistence::write_current_branch_name(tx, &commit.branch)?;
-        Persistence::write_current_latest_commit(tx, &commit.hash)?;
+        Persistence::write_current_commit_pointer(tx, &commit.hash)?;
         Ok(())
     })?;
 
@@ -67,7 +67,7 @@ mod test {
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::{
-        api::{test_utils, init_command::MAIN_BRANCH_NAME},
+        api::{init_command::MAIN_BRANCH_NAME, test_utils},
         db::db_ops::{Persistence, DB},
     };
 
@@ -93,7 +93,10 @@ mod test {
         .expect("Cannot restore checkpoint");
 
         // Number of commits stays the same
-        assert_eq!(test_utils::list_checkpoints(tmp_db_path, MAIN_BRANCH_NAME).len(), 2);
+        assert_eq!(
+            test_utils::list_checkpoints(tmp_db_path, MAIN_BRANCH_NAME).len(),
+            2
+        );
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
@@ -105,7 +108,7 @@ mod test {
         assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         let latest_commit_hash = db
-            .read_current_latest_commit()
+            .read_current_commit_pointer()
             .expect("Cannot read latest commit");
 
         // The latest commit hash is updated to the hash of the restored commit

@@ -18,8 +18,6 @@ pub fn switch_branches(db_path: &str, branch_name: &str, file_path: &str) -> Res
 
         db.execute_in_transaction(|tx| {
             Persistence::write_current_branch_name(tx, branch_name)?;
-
-            Persistence::write_current_latest_commit(tx, &hash)?;
             Ok(())
         })?;
 
@@ -34,7 +32,11 @@ mod test {
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::{
-        api::{init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME}, test_utils},
+        api::{
+            common::read_latest_commit_hash_on_branch,
+            init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+            test_utils,
+        },
         db::db_ops::{Persistence, DB},
     };
 
@@ -69,8 +71,7 @@ mod test {
         // The current branch name stays the same
         assert_eq!(current_branch_name, "main");
 
-        let latest_commit_hash = db
-            .read_current_latest_commit()
+        let latest_commit_hash = read_latest_commit_hash_on_branch(&db, &current_branch_name)
             .expect("Cannot read latest commit");
 
         // The latest commit hash stays the same
@@ -94,8 +95,12 @@ mod test {
 
         let tmp_blend_path = NamedTempFile::new().expect("Cannot create temp file");
 
-        switch_branches(tmp_db_path, MAIN_BRANCH_NAME, tmp_blend_path.path().to_str().unwrap())
-            .expect("Cannot switch branches");
+        switch_branches(
+            tmp_db_path,
+            MAIN_BRANCH_NAME,
+            tmp_blend_path.path().to_str().unwrap(),
+        )
+        .expect("Cannot switch branches");
 
         let db = Persistence::open(tmp_db_path).expect("Cannot open test DB");
 
@@ -104,7 +109,8 @@ mod test {
         assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
         // latest commit hash is set to the tip of the checked out branch
-        let lastest_commit_hash = db.read_current_latest_commit().unwrap();
+        let lastest_commit_hash =
+            read_latest_commit_hash_on_branch(&db, &current_branch_name).unwrap();
         assert_eq!(lastest_commit_hash, "a5f92d0a988085ed66c9dcdccc7b9c90");
 
         let main_tip = db.read_branch_tip(MAIN_BRANCH_NAME).unwrap().unwrap();

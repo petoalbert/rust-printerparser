@@ -1,11 +1,9 @@
 use crate::db::db_ops::{DBError, Persistence, DB};
 
-use super::{invariants::check_current_branch_current_commit_set, init_command::MAIN_BRANCH_NAME};
+use super::{common::read_latest_commit_hash_on_branch, init_command::MAIN_BRANCH_NAME};
 
 pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBError> {
     let mut db = Persistence::open(db_path)?;
-
-    check_current_branch_current_commit_set(&db)?;
 
     let current_brach_name = db.read_current_branch_name()?;
 
@@ -15,15 +13,13 @@ pub fn create_new_branch(db_path: &str, new_branch_name: &str) -> Result<(), DBE
         ));
     }
 
-    let tip = db.read_current_latest_commit()?;
+    let tip = read_latest_commit_hash_on_branch(&db, &current_brach_name)?;
 
     db.execute_in_transaction(|tx| {
         Persistence::write_branch_tip(tx, new_branch_name, &tip)?;
         Persistence::write_remote_branch_tip(tx, new_branch_name, &tip)?;
 
         Persistence::write_current_branch_name(tx, new_branch_name)?;
-
-        Persistence::write_current_latest_commit(tx, &tip)?;
         Ok(())
     })?;
 
@@ -35,7 +31,10 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::{init_command::INITIAL_COMMIT_HASH, test_utils},
+        api::{
+            common::read_latest_commit_hash_on_branch, init_command::INITIAL_COMMIT_HASH,
+            test_utils,
+        },
         db::db_ops::{Persistence, DB},
     };
 
@@ -64,8 +63,7 @@ mod test {
         // the current branch name is updated to the name of the new branch
         assert_eq!(current_branch_name, "dev");
 
-        let latest_commit_name = db
-            .read_current_latest_commit()
+        let latest_commit_name = read_latest_commit_hash_on_branch(&db, &current_branch_name)
             .expect("Cannot read latest commit");
 
         // the latest commit hash stays the same

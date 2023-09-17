@@ -9,7 +9,6 @@ pub fn init_db(db_path: &str, project_id: &str) -> Result<(), DBError> {
         Persistence::write_branch_tip(tx, MAIN_BRANCH_NAME, INITIAL_COMMIT_HASH)?;
         Persistence::write_remote_branch_tip(tx, MAIN_BRANCH_NAME, INITIAL_COMMIT_HASH)?;
         Persistence::write_current_branch_name(tx, MAIN_BRANCH_NAME)?;
-        Persistence::write_current_latest_commit(tx, INITIAL_COMMIT_HASH)?;
         Persistence::write_project_id(tx, project_id)?;
         Ok(())
     })?;
@@ -21,7 +20,7 @@ mod test {
     use tempfile::TempDir;
 
     use crate::{
-        api::init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
+        api::init_command::MAIN_BRANCH_NAME,
         db::db_ops::{Persistence, DB},
     };
 
@@ -38,11 +37,6 @@ mod test {
             .read_current_branch_name()
             .expect("Cannot read current branch name");
         assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
-
-        let latest_commit_name = db
-            .read_current_latest_commit()
-            .expect("Cannot read latest commit");
-        assert_eq!(latest_commit_name, INITIAL_COMMIT_HASH);
 
         let project_id = db.read_project_id().expect("Cannot read project id");
         assert_eq!(project_id, "my amazing project")

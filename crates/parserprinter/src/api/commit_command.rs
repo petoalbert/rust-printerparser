@@ -2,7 +2,7 @@ use flate2::{write::GzEncoder, Compression};
 use rayon::prelude::*;
 
 use crate::{
-    api::{invariants::check_current_branch_current_commit_set, utils::block_hash_diff},
+    api::{common::read_latest_commit_hash_on_branch, utils::block_hash_diff},
     blend::{
         blend_file::{Endianness, PointerSize},
         parsers::{blend, block, header as pheader, BlendFileParseState},
@@ -27,8 +27,6 @@ pub fn create_new_commit(
     message: Option<String>,
 ) -> Result<(), DBError> {
     let mut conn = Persistence::open(db_path)?;
-
-    check_current_branch_current_commit_set(&conn)?;
 
     let start_commit_command = Instant::now();
     let blend_bytes = measure_time!(format!("Reading {:?}", file_path), {
@@ -91,9 +89,9 @@ pub fn create_new_commit(
 
     let name = conn.read_name()?.unwrap_or("Anon".to_owned());
 
-    let current_brach_name = conn.read_current_branch_name()?;
+    let current_branch_name = conn.read_current_branch_name()?;
 
-    let latest_commit_hash = conn.read_current_latest_commit()?;
+    let latest_commit_hash = read_latest_commit_hash_on_branch(&conn, &current_branch_name)?;
 
     let latest_commit = conn.read_commit(&latest_commit_hash).ok().flatten();
 
@@ -116,15 +114,13 @@ pub fn create_new_commit(
     conn.write_blocks_str(&commit_hash, &blocks_str)?;
 
     conn.execute_in_transaction(|tx| {
-        Persistence::write_branch_tip(tx, &current_brach_name, &commit_hash)?;
-
-        Persistence::write_current_latest_commit(tx, &commit_hash)?;
+        Persistence::write_branch_tip(tx, &current_branch_name, &commit_hash)?;
 
         let commit = Commit {
             hash: commit_hash,
             prev_commit_hash: latest_commit_hash,
             project_id,
-            branch: current_brach_name,
+            branch: current_branch_name,
             message: message.unwrap_or_default(),
             author: name,
             date: timestamp(),
@@ -152,6 +148,7 @@ mod test {
 
     use crate::{
         api::{
+            common::read_latest_commit_hash_on_branch,
             init_command::{INITIAL_COMMIT_HASH, MAIN_BRANCH_NAME},
             test_utils,
         },
@@ -199,8 +196,7 @@ mod test {
         // The current branch name stays the same
         assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
-        let latest_commit_hash = db
-            .read_current_latest_commit()
+        let latest_commit_hash = read_latest_commit_hash_on_branch(&db, &current_branch_name)
             .expect("Cannot read latest commit");
 
         // The latest commit hash is updated to the hash of the new commit
@@ -240,8 +236,7 @@ mod test {
         // The current branch name stays the same
         assert_eq!(current_branch_name, MAIN_BRANCH_NAME);
 
-        let latest_commit_hash = db
-            .read_current_latest_commit()
+        let latest_commit_hash = read_latest_commit_hash_on_branch(&db, &current_branch_name)
             .expect("Cannot read latest commit");
 
         // The latest commit hash is updated to the hash of the new commit
