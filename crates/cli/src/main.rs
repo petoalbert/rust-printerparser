@@ -11,6 +11,7 @@ use parserprinter::{
         get_current_branch::get_current_branch,
         import_exchange,
         init_command::init_db,
+        init_from_import_command,
         list_branches_command::list_braches,
         log_checkpoints_command::list_checkpoints,
         new_branch_command::create_new_branch,
@@ -120,6 +121,21 @@ fn sync_to_server(db_path: &str, url: &str) {
     import_exchange::import_exchange(db_path, exchange).expect("Cannot import exchange file");
 }
 
+fn run_init_from_import(url: &str, db_path: &str, file_path: &str, project_id: &str) {
+    let res = reqwest::blocking::get(format!("{}/v1/clone/{}", url, project_id))
+        .expect("Cannot send import request");
+    if !res.status().is_success() {
+        println!("Error: {}", res.status().as_str());
+        return;
+    }
+
+    let exchange_data = res.bytes().expect("Cannot read response body");
+    let exchange = decode_exchange(&exchange_data).expect("Cannot decode exchange");
+
+    init_from_import_command::init_from_import_command(db_path, exchange, file_path)
+        .expect("Cannot init db from import");
+}
+
 fn main() {
     let args = parse_args();
     env_logger::init();
@@ -162,5 +178,11 @@ fn main() {
             branch_name,
         } => run_delete_branch_command(&db_path, &branch_name),
         Commands::SyncToServer { db_path, url } => sync_to_server(&db_path, &url),
+        Commands::InitFromImport {
+            url,
+            db_path,
+            file_path,
+            project_id,
+        } => run_init_from_import(&url, &db_path, &file_path, &project_id),
     }
 }

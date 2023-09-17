@@ -123,6 +123,24 @@ pub enum Commands {
         file_path: String,
     },
 
+    InitFromImport {
+        /// Url of the external server
+        #[arg(short, long)]
+        url: String,
+
+        /// Path to the blend file DB
+        #[arg(short, long)]
+        db_path: String,
+
+        /// Path to the blender file to create the DB from
+        #[arg(short, long)]
+        file_path: String,
+
+        /// ID of project to import
+        #[arg(short, long)]
+        project_id: String,
+    },
+
     /// Export descendants of a commit
     Export {
         /// Path to the blend file DB
@@ -158,7 +176,7 @@ pub enum Commands {
         /// Url of the external server
         #[arg(short, long)]
         url: String,
-    }
+    },
 }
 
 pub fn parse_args() -> Cli {
