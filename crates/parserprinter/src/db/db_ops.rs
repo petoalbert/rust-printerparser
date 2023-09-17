@@ -127,7 +127,7 @@ fn write_config_inner(tx: &rusqlite::Transaction, key: &str, value: &str) -> Res
     .map(|_| ())
 }
 
-fn read_config_inner(conn: rusqlite::Connection, key: &str) -> Result<Option<String>, DBError> {
+fn read_config_inner(conn: &rusqlite::Connection, key: &str) -> Result<Option<String>, DBError> {
     let mut stmt = conn
         .prepare("SELECT value FROM config WHERE key = ?1")
         .map_err(|_| DBError::Fundamental("Cannot prepare read commits query".to_owned()))?;
@@ -374,7 +374,7 @@ impl DB for Persistence {
     }
 
     fn read_current_branch_name(&self) -> Result<String, DBError> {
-        read_config_inner(self.sqlite_db, &current_branch_name_key())
+        read_config_inner(&self.sqlite_db, &current_branch_name_key())
             .map_err(|_| DBError::Error("Cannot read current branch name".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -497,7 +497,7 @@ impl DB for Persistence {
     }
 
     fn read_current_latest_commit(&self) -> Result<String, DBError> {
-        read_config_inner(self.sqlite_db, &current_latest_commit_key())
+        read_config_inner(&self.sqlite_db, &current_latest_commit_key())
             .map_err(|_| DBError::Error("Cannot read latest commit hash".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -528,7 +528,7 @@ impl DB for Persistence {
     }
 
     fn read_project_id(&self) -> Result<String, DBError> {
-        read_config_inner(self.sqlite_db, &project_id_key())
+        read_config_inner(&self.sqlite_db, &project_id_key())
             .map_err(|_| DBError::Error("Cannot read project id".to_owned()))
             .and_then(|v| {
                 v.map_or(
@@ -576,7 +576,7 @@ impl DB for Persistence {
     }
 
     fn read_name(&self) -> Result<Option<String>, DBError> {
-        read_config_inner(self.sqlite_db, &user_name_key())
+        read_config_inner(&self.sqlite_db, &user_name_key())
     }
 
     fn write_name(tx: &rusqlite::Transaction, name: &str) -> Result<(), DBError> {
