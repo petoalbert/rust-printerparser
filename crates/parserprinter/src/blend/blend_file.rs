@@ -1,7 +1,7 @@
 use super::utils::Either;
 use std::{fmt::Debug, num::NonZeroU64};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum PointerSize {
     Bits32,
     Bits64,
@@ -18,7 +18,7 @@ impl PointerSize {
 }
 
 /// Endianness of the machine used to create the .blend file.
-#[derive(Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Endianness {
     Little,
     Big,
